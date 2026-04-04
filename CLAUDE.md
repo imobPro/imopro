@@ -1,4 +1,4 @@
-# CLAUDE.md — ImobBot SaaS
+# CLAUDE.md — ImobPro SaaS
 
 Arquivo de contexto central. Leia este arquivo antes de qualquer ação no projeto.
 
@@ -57,7 +57,7 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 ## Estrutura de pastas
 
 ```
-/imobbot-saas
+/imobpro
   CLAUDE.md           ← este arquivo
   PRD.md              ← requisitos do produto
   PLAN.md             ← roadmap de fases
@@ -65,6 +65,7 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
   .gitignore
   .env.example
   /skills/
+    /iniciar-sprint/    ← entrevista de negócio antes de cada módulo
     /criar-modulo/
     /criar-migration/
     /integrar-zapi/
@@ -73,32 +74,47 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
     /commit-padrao/
   /src/
     /modules/
-      /whatsapp/      ← gateway Z-API
-      /ai-engine/     ← integração Claude API
-      /leads/         ← CRM e qualificação
-      /sentiment/     ← análise de sentimento
-      /reports/       ← geração de relatórios
-      /tenants/       ← gestão de imobiliárias
-      /auth/          ← JWT e onboarding
+      /whatsapp/
+      /ai-engine/
+      /leads/
+      /sentiment/
+      /reports/
+      /tenants/
+      /auth/
     /shared/
-      /database/      ← cliente Supabase e migrations
-      /queue/         ← workers BullMQ
+      /database/
+      /queue/
       /utils/
-  /frontend/          ← Next.js — painel do cliente
-  /docs/              ← specs técnicas de cada módulo
+  /frontend/
+  /docs/
 ```
 
 ---
 
 ## Disciplina de sessão — contexto
 
-A janela de contexto enche e o desempenho cai. Siga sempre:
+A janela de contexto enche e o desempenho cai. Seguir sempre sem exceção:
 
+- **Antes de cada sprint** — rodar a skill `iniciar-sprint` para entrevista de negócio
+- **A cada hora de trabalho** — verificar uso com `/context`
+- **Ao atingir 40–50% do contexto** — rodar `/compact` imediatamente, não esperar encher
 - **`/compact`** — ao final de cada sessão de trabalho
 - **`/clear`** — ao trocar de módulo completamente
-- **`/context`** — para verificar o uso atual do contexto
 - **Plan mode (Shift+Tab)** — sempre ao iniciar módulo novo ou tarefa complexa
 - **Auto accept** — somente após revisar e aprovar o plano
+
+---
+
+## Ritual de início de sprint — OBRIGATÓRIO
+
+Antes de construir qualquer módulo ou feature nova, seguir essa ordem:
+
+1. Rodar a skill `iniciar-sprint` — ela conduz uma entrevista de negócio
+2. Responder todas as perguntas com calma — são perguntas de comportamento, não técnicas
+3. Só depois do alinhamento, entrar em plan mode e planejar a implementação
+4. Aprovar o plano antes de executar
+
+Nunca pular a entrevista e ir direto para o código.
 
 ---
 
