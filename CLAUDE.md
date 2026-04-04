@@ -72,6 +72,7 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
     /prompt-claude-api/
     /gerar-relatorio/
     /commit-padrao/
+    /melhorar-skills/   ← meta-skill para avaliar e melhorar as próprias skills
   /src/
     /modules/
       /whatsapp/
