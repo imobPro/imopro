@@ -9,22 +9,22 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 0 — Setup inicial
-**Próximo passo:** Criar estrutura de pastas, configurar Git e instalar dependências base
+**Fase:** 1 — Backend central + atendimento WhatsApp
+**Próximo passo:** Iniciar Sprint 1 — Módulo WhatsApp (rodar skill `iniciar-sprint` antes)
 
 ---
 
 ## Fase 0 — Setup do projeto
 **Duração estimada:** 1 semana
-**Status:** 🔲 Não iniciado
+**Status:** ✅ Concluído
 
-- [ ] Criar repositório no GitHub
-- [ ] Criar estrutura de pastas conforme CLAUDE.md
-- [ ] Configurar `.gitignore` e `.env.example`
+- ✅ 2026-04-03 Criar repositório no GitHub
+- ✅ 2026-04-03 Criar estrutura de pastas conforme CLAUDE.md
+- ✅ 2026-04-03 Configurar `.gitignore` e `.env.example`
 - [ ] Instalar dependências base (Node.js, TypeScript, Express)
 - [ ] Configurar Supabase — projeto e credenciais
-- [ ] Criar skills iniciais (`/skills/`)
-- [ ] Primeiro commit no GitHub
+- ✅ 2026-04-03 Criar skills iniciais (`/skills/`)
+- ✅ 2026-04-03 Primeiro commit no GitHub
 
 ---
 

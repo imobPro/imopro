@@ -72,4 +72,36 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-04-05] — Setup do projeto e estrutura base
+
+**Fase:** Fase 0 — Setup
+**Duração:** configuração inicial
+
+### O que foi feito
+- Criada estrutura completa de pastas do projeto (`/src`, `/skills`, `/frontend`, `/docs`)
+- Configurado `.gitignore` e `.env.example`
+- Criadas todas as skills iniciais com SKILL.md completo: `iniciar-sprint`, `criar-modulo`, `criar-migration`, `integrar-zapi`, `prompt-claude-api`, `gerar-relatorio`, `commit-padrao`, `seguranca`, `melhorar-skills`
+- Criado `lessons.md` para registro de erros e correções
+- Configurado `.claude/settings.local.json` com permissões automáticas de git
+- Corrigido bug de sintaxe nas permissões do `settings.local.json`
+
+### Arquivos criados ou modificados
+- `skills/*/SKILL.md` — todas as skills com instruções completas
+- `skills/seguranca/SKILL.md` — skill de segurança com 6 camadas e checklist pré-deploy
+- `lessons.md` — registro de lições aprendidas (estrutura criada, sem lições reais ainda)
+- `.claude/settings.local.json` — permissões automáticas para git add, commit, status, diff, log
+- `PLAN.md` — atualizado com status real da Fase 0
+
+### Decisões tomadas
+- Permissões automáticas apenas para comandos git de leitura e commit — comandos destrutivos exigem aprovação manual
+- Skill de segurança cobre LGPD explicitamente — obrigação legal para dados de leads brasileiros
+
+### Pendências para próxima sessão
+- [ ] Rodar skill `iniciar-sprint` antes de começar o Sprint 1
+- [ ] Instalar dependências base (Node.js, TypeScript, Express)
+- [ ] Configurar Supabase — projeto e credenciais
+- [ ] Iniciar Sprint 1 — Módulo WhatsApp
+
+---
+
 <!-- Adicione novas sessões acima desta linha -->

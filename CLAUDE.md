@@ -58,21 +58,23 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 ```
 /imobpro
-  CLAUDE.md           ← este arquivo
-  PRD.md              ← requisitos do produto
-  PLAN.md             ← roadmap de fases
-  CHANGELOG.md        ← registro de sessões
+  CLAUDE.md               ← este arquivo
+  PRD.md                  ← requisitos do produto
+  PLAN.md                 ← roadmap de fases
+  CHANGELOG.md            ← registro do que foi construído
+  lessons.md              ← registro de erros e correções
   .gitignore
   .env.example
   /skills/
-    /iniciar-sprint/    ← entrevista de negócio antes de cada módulo
+    /iniciar-sprint/      ← entrevista de negócio antes de cada módulo
     /criar-modulo/
     /criar-migration/
     /integrar-zapi/
     /prompt-claude-api/
     /gerar-relatorio/
     /commit-padrao/
-    /melhorar-skills/   ← meta-skill para avaliar e melhorar as próprias skills
+    /seguranca/
+    /melhorar-skills/
   /src/
     /modules/
       /whatsapp/
@@ -96,6 +98,7 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 A janela de contexto enche e o desempenho cai. Seguir sempre sem exceção:
 
+- **Ao iniciar qualquer sessão** — ler o `lessons.md` para evitar repetir erros anteriores
 - **Antes de cada sprint** — rodar a skill `iniciar-sprint` para entrevista de negócio
 - **A cada hora de trabalho** — verificar uso com `/context`
 - **Ao atingir 40–50% do contexto** — rodar `/compact` imediatamente, não esperar encher
@@ -110,12 +113,62 @@ A janela de contexto enche e o desempenho cai. Seguir sempre sem exceção:
 
 Antes de construir qualquer módulo ou feature nova, seguir essa ordem:
 
-1. Rodar a skill `iniciar-sprint` — ela conduz uma entrevista de negócio
-2. Responder todas as perguntas com calma — são perguntas de comportamento, não técnicas
-3. Só depois do alinhamento, entrar em plan mode e planejar a implementação
-4. Aprovar o plano antes de executar
+1. Ler o `lessons.md` — verificar se há erros anteriores relevantes para esta tarefa
+2. Rodar a skill `iniciar-sprint` — conduz entrevista de negócio com o dono do projeto
+3. Responder todas as perguntas com calma — são perguntas de comportamento, não técnicas
+4. Entrar em plan mode e propor o plano de implementação
+5. Aguardar aprovação do plano antes de executar
 
 Nunca pular a entrevista e ir direto para o código.
+
+---
+
+## Self-Improvement Loop — OBRIGATÓRIO
+
+Toda vez que Arthur fizer uma correção no trabalho apresentado:
+
+1. **Parar imediatamente** e entender o que estava errado
+2. **Registrar no `lessons.md`** o padrão do erro e a regra que evita que se repita
+3. **Aplicar a correção** com a abordagem correta
+4. **Revisar o `lessons.md`** no início da próxima sessão
+
+O objetivo é que o mesmo erro nunca aconteça duas vezes no projeto.
+
+---
+
+## Autonomous Bug Fixing
+
+Quando receber um relato de bug ou erro:
+
+1. **Não pedir orientação** — ir direto nos logs, mensagens de erro e testes
+2. **Identificar a causa raiz** — nunca corrigir sintoma sem entender a causa
+3. **Propor a solução elegante** — não fazer remendos temporários
+4. **Testar a correção** antes de apresentar como resolvida
+5. **Nunca marcar como resolvido** sem provar que funciona
+
+Se o bug envolve decisão de produto (comportamento esperado), usar AskUserQuestion Tool antes de corrigir.
+
+---
+
+## Demand Elegance
+
+Para qualquer mudança não trivial (mais de 10 linhas ou impacto em múltiplos arquivos):
+
+- Pausar e perguntar internamente: **"existe uma forma mais elegante?"**
+- Se a solução parece um remendo: reescrever com a solução correta desde o início
+- Impacto mínimo — tocar apenas o que é necessário, não introduzir complexidade desnecessária
+- Pular esta etapa apenas para correções simples e óbvias
+
+---
+
+## Verificação antes de concluir
+
+Nunca marcar uma tarefa como concluída sem:
+
+- Provar que funciona — rodar os testes ou demonstrar o comportamento
+- Verificar se passou no checklist da skill correspondente
+- Confirmar que nenhuma regra de arquitetura foi violada
+- Perguntar internamente: *"um desenvolvedor sênior aprovaria este código?"*
 
 ---
 
