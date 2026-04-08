@@ -104,4 +104,32 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-04-08] — Configuração de comandos e regras de comunicação
+
+**Fase:** Fase 0 — Setup
+**Duração:** configuração
+
+### O que foi feito
+- Criados slash commands `/commit-sprint` e `/revisar-modulo` para padronizar o fluxo de trabalho
+- Configurado `settings.json` com permissões seguras do Claude Code (allow/deny explícitos)
+- Criada skill de comunicação que define como o Claude deve explicar ações ao Arthur em linguagem simples
+
+### Arquivos criados
+- `.claude/commands/commit-sprint.md` — comando para fechar sprints com checklist completo
+- `.claude/commands/revisar-modulo.md` — comando com feedback loop automático de revisão
+- `.claude/settings.json` — permissões do Claude Code com comandos seguros autorizados
+- `skills/comunicacao/SKILL.md` — regra de comunicação para linguagem acessível durante o trabalho
+
+### Decisões tomadas
+- Slash commands versionados no repositório para garantir consistência entre sessões
+- Permissões explícitas no settings.json — nenhum comando destrutivo autorizado automaticamente
+- Regra de comunicação criada como skill para que esteja sempre acessível como referência
+
+### Pendências para próxima sessão
+- [ ] Rodar skill `iniciar-sprint` antes de começar o Sprint 1
+- [ ] Instalar dependências base (Node.js, TypeScript, Express)
+- [ ] Configurar Supabase — projeto e credenciais
+
+---
+
 <!-- Adicione novas sessões acima desta linha -->
