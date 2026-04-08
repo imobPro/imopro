@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(pwd)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(echo *)",
+      "Bash(which *)",
+      "Bash(type *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -f *)",
+      "Bash(sudo *)",
+      "Bash(chmod -R *)",
+      "Bash(chown *)",
+      "Bash(curl * | bash)",
+      "Bash(wget * | bash)",
+      "Bash(> /etc/*)",
+      "Bash(dd *)",
+      "Bash(mkfs *)",
+      "Bash(shutdown *)",
+      "Bash(reboot *)",
+      "Bash(kill -9 *)",
+      "Bash(pkill *)",
+      "Bash(format *)"
+    ]
+  }
+}
