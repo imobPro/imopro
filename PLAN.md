@@ -21,7 +21,7 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ✅ 2026-04-03 Criar repositório no GitHub
 - ✅ 2026-04-03 Criar estrutura de pastas conforme CLAUDE.md
 - ✅ 2026-04-03 Configurar `.gitignore` e `.env.example`
-- [ ] Instalar dependências base (Node.js, TypeScript, Express)
+- ✅ 2026-04-11 Instalar dependências base (Node.js, TypeScript, Express)
 - [ ] Configurar Supabase — projeto e credenciais
 - ✅ 2026-04-03 Criar skills iniciais (`/skills/`)
 - ✅ 2026-04-03 Primeiro commit no GitHub

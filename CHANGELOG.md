@@ -132,4 +132,31 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-04-11] — Instalação de dependências base e configuração TypeScript
+
+**Fase:** Fase 0 — Setup
+**Duração:** configuração
+
+### O que foi feito
+- Inicializado `package.json` com `npm init`
+- Instaladas dependências de produção: `express`, `helmet`, `express-rate-limit`, `zod`, `bcryptjs`, `jsonwebtoken`, `cors`
+- Instaladas dependências de desenvolvimento: `typescript`, `ts-node`, `tsx` e todos os `@types/*`
+- Configurado `tsconfig.json` com TypeScript strict mode completo
+- Criado `src/index.ts` com servidor Express já com helmet, cors e rate limiting aplicados
+- Confirmado: TypeScript compila sem erros, servidor sobe na porta 3000
+
+### Arquivos criados ou modificados
+- `package.json` — scripts `dev`, `build`, `start` adicionados
+- `tsconfig.json` — strict mode, rootDir `src/`, outDir `dist/`
+- `src/index.ts` — servidor Express com camadas de segurança base
+
+### Decisões tomadas
+- `tsx watch` para desenvolvimento (mais rápido que `ts-node-dev`)
+- Rate limit geral de 100 req/min aplicado globalmente no servidor
+- CORS configurado via variável `APP_URL` — nunca hardcodado
+
+### Pendências para próxima sessão
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 1 — Módulo WhatsApp
+- [ ] Configurar Supabase — projeto e credenciais
+
 <!-- Adicione novas sessões acima desta linha -->
