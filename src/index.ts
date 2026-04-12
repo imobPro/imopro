@@ -1,7 +1,9 @@
+import 'dotenv/config'
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
+import { whatsappRouter, startWhatsAppWorker } from './modules/whatsapp'
 
 const app = express()
 const PORT = process.env.PORT ?? 3000
@@ -28,8 +30,12 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', project: 'ImobPro' })
 })
 
+// Módulo WhatsApp
+app.use('/webhook', whatsappRouter)
+
 app.listen(PORT, () => {
   console.log(`ImobPro rodando na porta ${PORT}`)
+  startWhatsAppWorker()
 })
 
 export default app

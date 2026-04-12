@@ -10,7 +10,7 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 ## Status atual
 
 **Fase:** 1 — Backend central + atendimento WhatsApp
-**Próximo passo:** Iniciar Sprint 1 — Módulo WhatsApp (rodar skill `iniciar-sprint` antes)
+**Próximo passo:** Sprint 2 — Motor de IA (rodar skill `iniciar-sprint` antes)
 
 ---
 
@@ -22,7 +22,7 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ✅ 2026-04-03 Criar estrutura de pastas conforme CLAUDE.md
 - ✅ 2026-04-03 Configurar `.gitignore` e `.env.example`
 - ✅ 2026-04-11 Instalar dependências base (Node.js, TypeScript, Express)
-- [ ] Configurar Supabase — projeto e credenciais
+- ✅ 2026-04-12 Configurar Supabase — projeto e credenciais
 - ✅ 2026-04-03 Criar skills iniciais (`/skills/`)
 - ✅ 2026-04-03 Primeiro commit no GitHub
 
@@ -30,14 +30,14 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Fase 1 — Backend central + atendimento WhatsApp
 **Duração estimada:** Mês 1–3
-**Status:** 🔲 Não iniciado
+**Status:** 🔄 Em andamento
 
 ### Sprint 1 — Módulo WhatsApp
-- [ ] Configurar Z-API e testar recepção de webhook
-- [ ] Criar endpoint de recepção de mensagens
-- [ ] Configurar fila BullMQ + Redis
-- [ ] Enfileirar mensagens recebidas
-- [ ] Criar worker que processa a fila
+- ✅ 2026-04-12 Configurar Z-API e testar recepção de webhook
+- ✅ 2026-04-12 Criar endpoint de recepção de mensagens
+- ✅ 2026-04-12 Configurar fila BullMQ + Redis
+- ✅ 2026-04-12 Enfileirar mensagens recebidas
+- ✅ 2026-04-12 Criar worker que processa a fila
 
 ### Sprint 2 — Motor de IA
 - [ ] Integrar Claude API (Sonnet)

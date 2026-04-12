@@ -159,4 +159,50 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - [ ] Rodar skill `iniciar-sprint` antes do Sprint 1 — Módulo WhatsApp
 - [ ] Configurar Supabase — projeto e credenciais
 
+## [2026-04-12] — Sprint 1: Módulo WhatsApp
+
+**Fase:** Fase 1 — Backend central + atendimento WhatsApp
+**Duração:** 1 sessão
+
+### O que foi feito
+- Conduzida entrevista de negócio (skill `iniciar-sprint`) com 5 perguntas sobre o módulo WhatsApp
+- Definidos 6 gatilhos de transferência para corretor humano
+- Definido SLA de não-resposta: 15 min aviso automático, 1h alerta gestor + IA retoma
+- Definidos 6 perfis de lead: Comprador, Inquilino, Vendedor, Captação, Investidor, Indicador
+- Definido score de qualificação 1–5 com notificação imediata para score 4–5
+- Instaladas dependências: `bullmq`, `ioredis`, `dotenv`
+- Criada infraestrutura de fila: Redis singleton, BullMQ queue com retry exponencial
+- Criado utilitário de horário comercial configurável por tenant (fuso America/Sao_Paulo)
+- Criado módulo whatsapp completo: types, service, controller, routes, worker, index
+- Webhook seguro com validação de `client-token` (header Z-API)
+- Worker BullMQ com concorrência 5 e os 6 gatilhos de transferência implementados
+- Mensagem automática de fora de horário via Z-API
+- Servidor atualizado com `dotenv/config` e montagem do módulo em `/webhook`
+
+### Arquivos criados ou modificados
+- `src/shared/queue/queue.types.ts` — interface WhatsAppMessageJob
+- `src/shared/queue/redis.ts` — singleton ioredis
+- `src/shared/queue/queues.ts` — BullMQ queue com retry exponencial
+- `src/shared/utils/business-hours.ts` — utilitário de horário comercial
+- `src/modules/whatsapp/whatsapp.types.ts` — tipos Z-API, LeadProfile, TransferReason
+- `src/modules/whatsapp/whatsapp.service.ts` — enqueueMessage, detectLeadProfile, shouldTransferToHuman, buildZApiClient
+- `src/modules/whatsapp/whatsapp.controller.ts` — receiveWebhook com validação de token
+- `src/modules/whatsapp/whatsapp.routes.ts` — POST /webhook/whatsapp, GET /webhook/health
+- `src/modules/whatsapp/whatsapp.worker.ts` — worker com lógica de negócio e stubs para Sprint 2/3
+- `src/modules/whatsapp/index.ts` — exports do módulo
+- `src/index.ts` — dotenv/config + montagem do router + init do worker
+
+### Decisões tomadas
+- `ioredis` como cliente Redis (mais estável que `redis` npm para BullMQ)
+- Servidor não crasha com Redis indisponível — ioredis reconecta em background
+- `ZAPI_CLIENT_TOKEN` obrigatório — sem token configurado, 100% dos requests são rejeitados
+- `fromMe: true` e eventos de status são ignorados silenciosamente (200 sem enfileirar)
+- Worker retorna 200 mesmo em erro de enfileiramento (evita retentativas duplicadas do Z-API)
+- Stubs explícitos com `// TODO Sprint 2/3` para IA e persistência no banco
+
+### Pendências para próxima sessão
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 2 — Motor de IA
+- [ ] Configurar `ZAPI_CLIENT_TOKEN` no .env para testes com Z-API real
+- [ ] Configurar Redis (Railway ou Upstash) para ambiente de desenvolvimento
+
 <!-- Adicione novas sessões acima desta linha -->
