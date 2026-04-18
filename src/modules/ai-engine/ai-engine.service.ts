@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 import { buildSystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
@@ -11,8 +12,12 @@ import type {
 if (!process.env.ANTHROPIC_API_KEY) {
   throw new Error('ANTHROPIC_API_KEY não definida no ambiente')
 }
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY não definida no ambiente')
+}
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const MODEL = process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-sonnet-4-6'
 const MAX_HISTORY = 20
@@ -51,13 +56,36 @@ export function clearHistory(tenantId: string, phone: string): void {
 
 export async function transcribeAudio(
   mediaUrl: string,
-  _mimeType: string
+  mimeType: string
 ): Promise<string | null> {
-  // TODO Sprint 2+: integrar Whisper API (OpenAI) ou AssemblyAI para transcrição de áudio.
-  // Claude API não suporta entrada de áudio nativo — requer STT dedicado.
-  // Por ora retorna null → worker exibe mensagem neutra ao lead.
-  void mediaUrl
-  return null
+  try {
+    // 1. Baixar o áudio da URL do Z-API
+    const response = await fetch(mediaUrl)
+    if (!response.ok) {
+      console.error(`[AI] Falha ao baixar áudio | status=${response.status} url=${mediaUrl}`)
+      return null
+    }
+
+    const buffer = await response.arrayBuffer()
+    const filename = `audio.${mimeType.split('/')[1] ?? 'ogg'}`
+
+    // 2. Enviar para o Whisper (OpenAI) como File
+    const file = new File([buffer], filename, { type: mimeType })
+
+    const result = await openai.audio.transcriptions.create({
+      file,
+      model: 'whisper-1',
+      language: 'pt',
+    })
+
+    const transcription = result.text.trim()
+    console.log(`[AI] Áudio transcrito | chars=${transcription.length}`)
+    return transcription || null
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[AI] Falha na transcrição de áudio | erro=${msg}`)
+    return null
+  }
 }
 
 function detectIntent(text: string): IntentType {
