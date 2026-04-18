@@ -5,6 +5,7 @@ export {
   saveConversationMessages,
   flagInactiveLeads,
   calcScoreDelta,
+  getAiFailedAttempts,
 } from './leads.service'
 
 export type {

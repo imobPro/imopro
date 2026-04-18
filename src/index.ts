@@ -1,4 +1,7 @@
 import 'dotenv/config'
+import { validateEnv } from './shared/utils/validate-env'
+validateEnv()
+
 import express from 'express'
 import helmet from 'helmet'
 import cors from 'cors'

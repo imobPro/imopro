@@ -16,6 +16,7 @@ import {
   scoreUp,
   saveConversationMessages,
   calcScoreDelta,
+  getAiFailedAttempts,
 } from '../leads'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext } from './whatsapp.types'
@@ -130,13 +131,14 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       }
 
       // 4. Montar contexto para avaliação de transferência
-      // Sprint 3 buscará messageCount e aiFailedAttempts do banco
+      // aiFailedAttempts lido do banco para persistir entre mensagens diferentes
+      const aiFailedAttempts = await getAiFailedAttempts(tenantId, phone).catch(() => 0)
       const context: ConversationContext = {
         tenantId,
         phone,
         messageCount: pendingMessages.length,
         lastText,
-        aiFailedAttempts: 0,
+        aiFailedAttempts,
         isWithinBusinessHours: withinHours,
       }
 

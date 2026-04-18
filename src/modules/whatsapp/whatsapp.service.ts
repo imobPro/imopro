@@ -111,21 +111,30 @@ function extractMimeType(payload: ZApiWebhookPayload): string | null {
 // Sprint 2 substituirá isso por análise via Claude API
 // ---------------------------------------------------------------------------
 
+// Ordem importa: perfis mais específicos primeiro para evitar falsos positivos
+// Ex: 'investidor' antes de 'comprador' pois 'comprar para alugar' contém 'comprar'
+//     'inquilino' antes de 'comprador' pois mensagens de aluguel podem ter 'apartamento'
+const PROFILE_PRIORITY: LeadProfile[] = [
+  'investidor', 'captacao', 'indicador', 'vendedor', 'inquilino', 'comprador',
+]
+
 const PROFILE_KEYWORDS: Record<LeadProfile, string[]> = {
-  comprador: ['comprar', 'compra', 'quero comprar', 'financiamento', 'entrada', 'apartamento', 'casa'],
-  inquilino: ['alugar', 'aluguel', 'locação', 'quero alugar', 'morar de aluguel'],
-  vendedor: ['vender', 'venda', 'quero vender', 'meu imóvel', 'preciso vender'],
-  captacao: ['administrar', 'administração', 'administração de imóvel', 'colocar para alugar'],
+  // 'casa' removido — genérico demais, causava falsos positivos em vendedor/inquilino
+  comprador:  ['quero comprar', 'financiamento', 'entrada', 'apartamento', 'quero adquirir'],
+  inquilino:  ['alugar', 'aluguel', 'locacao', 'quero alugar', 'morar de aluguel'],
+  vendedor:   ['vender', 'venda', 'quero vender', 'meu imovel', 'preciso vender'],
+  captacao:   ['administrar', 'administracao', 'colocar para alugar'],
   investidor: ['investimento', 'investir', 'retorno', 'renda', 'revender', 'comprar para alugar'],
-  indicador: ['indicar', 'indicação', 'meu amigo', 'minha amiga', 'conheço alguém'],
+  indicador:  ['indicar', 'indicacao', 'meu amigo', 'minha amiga', 'conheco alguem'],
 }
 
 export function detectLeadProfile(text: string): LeadProfile | null {
   const normalized = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-  for (const [profile, keywords] of Object.entries(PROFILE_KEYWORDS)) {
+  for (const profile of PROFILE_PRIORITY) {
+    const keywords = PROFILE_KEYWORDS[profile]
     if (keywords.some(kw => normalized.includes(kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
-      return profile as LeadProfile
+      return profile
     }
   }
 
@@ -136,16 +145,17 @@ export function detectLeadProfile(text: string): LeadProfile | null {
 // Avaliação dos gatilhos de transferência para corretor humano
 // ---------------------------------------------------------------------------
 
+// Palavras-chave normalizadas (sem acento) para match mais robusto
 const TRANSFER_KEYWORDS = [
-  'falar com humano', 'falar com pessoa', 'falar com corretor',
-  'quero atendimento humano', 'atendente humano', 'não quero falar com robô',
-  'preciso de uma pessoa', 'me liga', 'podem me ligar',
+  'falar com humano', 'falar com pessoa', 'falar com corretor', 'falar com atendente',
+  'atendimento humano', 'atendente humano', 'nao quero falar com robo',
+  'preciso de uma pessoa', 'me liga', 'podem me ligar', 'quero falar com alguem',
 ]
 
 const CLOSING_KEYWORDS = [
-  'quero visitar', 'posso visitar', 'agendar visita', 'marcar visita',
-  'qual o valor', 'qual o preço', 'condições de pagamento', 'entrada',
-  'documentação', 'contrato', 'aceita proposta', 'tenho interesse',
+  'quero visitar', 'posso visitar', 'agendar visita', 'marcar visita', 'fazer uma visita',
+  'qual o valor', 'qual o preco', 'condicoes de pagamento', 'aceita proposta',
+  'documentacao', 'contrato', 'tenho interesse', 'quero fechar',
 ]
 
 export function shouldTransferToHuman(context: ConversationContext): TransferReason | null {

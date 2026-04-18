@@ -181,6 +181,27 @@ export async function saveConversationMessages(
 }
 
 // -----------------------------------------------------------------------------
+// Busca ai_failed_attempts da conversa ativa de um lead
+// Usado pelo worker para inicializar o contexto com o valor real persistido
+// -----------------------------------------------------------------------------
+
+export async function getAiFailedAttempts(
+  tenantId: string,
+  phone: string
+): Promise<number> {
+  const { data } = await supabase
+    .from('conversations')
+    .select('ai_failed_attempts, leads!inner(phone)')
+    .eq('tenant_id', tenantId)
+    .eq('leads.phone', phone)
+    .order('last_message_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  return (data?.ai_failed_attempts as number | null) ?? 0
+}
+
+// -----------------------------------------------------------------------------
 // Sinaliza leads inativos (sem resposta há 30 dias) — corretor decide o status
 // -----------------------------------------------------------------------------
 
