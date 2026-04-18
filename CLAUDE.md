@@ -183,6 +183,19 @@ Nunca marcar uma tarefa como concluída sem:
 
 ---
 
+## Tom do agente de IA
+
+Regras obrigatórias para todos os system prompts e respostas geradas pelo agente imobiliário:
+
+- **Nunca usar emojis** — nem nas respostas ao lead, nem nas mensagens do sistema
+- **Tom profissional e humanizado** — como um atendente bem treinado, não um robô nem um vendedor ansioso
+- **Usar o nome do corretor e do lead quando disponível** — personaliza sem ser invasivo
+- **Frases diretas e objetivas** — sem exagero de cordialidade, sem "Claro!", "Com certeza!", "Ótimo!"
+- **Áudio recebido do lead** — Claude API transcreve para texto e a IA responde normalmente, sem avisar o lead
+- **Se transcrição de áudio vier confusa** — pedir para repetir com mensagem neutra: "Não consegui entender bem sua mensagem. Pode me enviar novamente ou escrever o que precisa?" (nunca mencionar qualidade do áudio)
+
+---
+
 ## Contexto de negócio
 
 - Mercado-alvo: imobiliárias pequenas e médias no Brasil

@@ -205,4 +205,45 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - [ ] Configurar `ZAPI_CLIENT_TOKEN` no .env para testes com Z-API real
 - [ ] Configurar Redis (Railway ou Upstash) para ambiente de desenvolvimento
 
+## [2026-04-18] — Sprint 2: Motor de IA
+
+**Fase:** Fase 1 — Backend central + atendimento WhatsApp
+**Duração:** 1 sessão
+
+### O que foi feito
+- Conduzida entrevista de negócio (skill `iniciar-sprint`) com 5 perguntas sobre o motor de IA
+- Adicionada seção "Tom do agente de IA" no CLAUDE.md com regras de identidade e comunicação
+- Instalado `@anthropic-ai/sdk` como dependência de produção
+- Criado módulo `/src/modules/ai-engine/` com 4 arquivos
+- Implementado debounce de 8s para agrupar mensagens rápidas do mesmo lead
+- Implementado histórico de conversa em memória com sliding window de 20 mensagens
+- Implementado timer de handoff: IA continua por 15min, depois re-notifica corretor
+- Worker reescrito com fluxo completo de IA integrado
+- Mensagem de horário comercial corrigida (sem emoji, conforme regras de tom)
+
+### Arquivos criados
+- `src/modules/ai-engine/ai-engine.types.ts` — AgentConfig, ConversationMessage, AIResponse, IntentType, PendingMessage
+- `src/modules/ai-engine/ai-engine.prompts.ts` — buildSystemPrompt() com regras de tom e persona
+- `src/modules/ai-engine/ai-engine.service.ts` — generateResponse(), transcribeAudio() stub, histórico
+- `src/modules/ai-engine/index.ts` — exports do módulo
+
+### Arquivos modificados
+- `src/modules/whatsapp/whatsapp.service.ts` — debounce com Redis RPUSH + job deduplicado, popPendingMessages()
+- `src/modules/whatsapp/whatsapp.worker.ts` — TODOs Sprint 2 substituídos por chamadas reais ao ai-engine
+- `CLAUDE.md` — seção "Tom do agente de IA" adicionada
+- `.env.example` — variáveis AGENT_NAME e REALTY_NAME adicionadas
+
+### Decisões tomadas
+- Identidade do agente: configurável por tenant via AGENT_NAME/REALTY_NAME (Sprint 5 moverá para banco)
+- Debounce: Redis RPUSH + BullMQ jobId fixo — sem job duplicado, mensagens acumuladas na lista
+- Transcrição de áudio: stub (retorna null → mensagem neutra) — Claude API não suporta áudio nativo; requer Whisper/AssemblyAI no futuro
+- Handoff timer: flag Redis + job BullMQ delayed com 15min de prazo
+- Histórico: Map em memória com max 20 msgs (Sprint 3 persistirá no Supabase)
+
+### Pendências para próxima sessão
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 3 — CRM de leads
+- [ ] Configurar ANTHROPIC_API_KEY no .env para testes reais
+- [ ] Configurar ZAPI_TOKEN para testes com WhatsApp real
+- [ ] Avaliar integração Whisper para transcrição de áudio
+
 <!-- Adicione novas sessões acima desta linha -->

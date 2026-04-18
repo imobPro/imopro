@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/imobPro/imopro#readme",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.73.5",
     "cors": "^2.8.6",

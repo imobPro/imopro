@@ -1,6 +1,8 @@
 import { whatsappQueue } from '../../shared/queue/queues'
+import { redisConnection } from '../../shared/queue/redis'
 import { getNextBusinessDay } from '../../shared/utils/business-hours'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
+import type { PendingMessage } from '../ai-engine/ai-engine.types'
 import type {
   ZApiWebhookPayload,
   LeadProfile,
@@ -10,8 +12,11 @@ import type {
   ZApiSendTextPayload,
 } from './whatsapp.types'
 
+const DEBOUNCE_DELAY_MS = 8000
+const PENDING_TTL_SECONDS = 300 // 5 minutos
+
 // ---------------------------------------------------------------------------
-// Enfileiramento de mensagens recebidas
+// Enfileiramento de mensagens recebidas com debounce de 8s
 // ---------------------------------------------------------------------------
 
 export async function enqueueMessage(
@@ -19,24 +24,54 @@ export async function enqueueMessage(
   tenantId: string
 ): Promise<void> {
   const type = detectMessageType(payload)
+  const pendingKey = `pending:${tenantId}:${payload.phone}`
+  const debounceJobId = `debounce:${tenantId}:${payload.phone}`
 
-  const job: WhatsAppMessageJob = {
-    jobId: payload.messageId,
+  const pending: PendingMessage = {
+    text: payload.text?.message ?? payload.image?.caption ?? null,
+    mediaUrl: extractMediaUrl(payload),
+    mimeType: extractMimeType(payload),
+    type,
+    timestamp: payload.momment,
+  }
+
+  // Empilha a mensagem na lista Redis do lead
+  await redisConnection.rpush(pendingKey, JSON.stringify(pending))
+  await redisConnection.expire(pendingKey, PENDING_TTL_SECONDS)
+
+  // Job de trigger — BullMQ deduplica por jobId: só o primeiro é aceito
+  const triggerJob: WhatsAppMessageJob = {
+    jobId: debounceJobId,
     tenantId,
     instanceId: payload.instanceId,
     phone: payload.phone,
     messageId: payload.messageId,
     type,
-    text: payload.text?.message ?? payload.image?.caption ?? null,
-    mediaUrl: extractMediaUrl(payload),
-    mimeType: extractMimeType(payload),
+    text: pending.text,
+    mediaUrl: pending.mediaUrl,
+    mimeType: pending.mimeType,
     timestamp: payload.momment,
     isFromMe: payload.fromMe,
   }
 
-  await whatsappQueue.add(payload.messageId, job, {
-    jobId: payload.messageId, // deduplicação por ID de mensagem
+  await whatsappQueue.add(debounceJobId, triggerJob, {
+    jobId: debounceJobId,
+    delay: DEBOUNCE_DELAY_MS,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Leitura e limpeza das mensagens pendentes do lead (chamado pelo worker)
+// ---------------------------------------------------------------------------
+
+export async function popPendingMessages(
+  tenantId: string,
+  phone: string
+): Promise<PendingMessage[]> {
+  const pendingKey = `pending:${tenantId}:${phone}`
+  const raw = await redisConnection.lrange(pendingKey, 0, -1)
+  await redisConnection.del(pendingKey)
+  return raw.map((item) => JSON.parse(item) as PendingMessage)
 }
 
 // ---------------------------------------------------------------------------
@@ -155,9 +190,9 @@ export function getBusinessHoursMessage(tenantId: string): string {
   void tenantId
   const nextDay = getNextBusinessDay()
   return (
-    `Olá! Recebemos sua mensagem. 😊\n\n` +
+    `Olá! Recebemos sua mensagem.\n\n` +
     `No momento estamos fora do horário de atendimento, mas nossa equipe retornará seu contato na ${nextDay}.\n\n` +
-    `Seus dados já foram registrados e um corretor entrará em contato em breve!`
+    `Seus dados já foram registrados e um corretor entrará em contato em breve.`
   )
 }
 

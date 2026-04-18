@@ -40,11 +40,13 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ✅ 2026-04-12 Criar worker que processa a fila
 
 ### Sprint 2 — Motor de IA
-- [ ] Integrar Claude API (Sonnet)
-- [ ] Criar system prompt base para agente imobiliário
-- [ ] Implementar detecção de intenção (compra, aluguel, venda, info)
-- [ ] Implementar lógica de handoff para corretor humano
-- [ ] Manter histórico de conversa por lead no Supabase
+- ✅ 2026-04-18 Integrar Claude API (Sonnet) via @anthropic-ai/sdk
+- ✅ 2026-04-18 Criar system prompt base para agente imobiliário (configurável por tenant)
+- ✅ 2026-04-18 Implementar detecção de intenção (compra, aluguel, venda, visita, info)
+- ✅ 2026-04-18 Implementar debounce de 8s para batch de mensagens rápidas
+- ✅ 2026-04-18 Implementar lógica de handoff com timer de 15min e re-notificação
+- ✅ 2026-04-18 Manter histórico de conversa em memória (max 20 msgs, sliding window)
+- ⚠️  Transcrição de áudio: stub implementado — requer STT externo (Whisper) no futuro
 
 ### Sprint 3 — CRM de leads
 - [ ] Criar schema Supabase: `tenants`, `leads`, `conversations`, `messages`
