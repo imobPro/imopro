@@ -49,11 +49,13 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ⚠️  Transcrição de áudio: stub implementado — requer STT externo (Whisper) no futuro
 
 ### Sprint 3 — CRM de leads
-- [ ] Criar schema Supabase: `tenants`, `leads`, `conversations`, `messages`
-- [ ] Ativar RLS em todas as tabelas com `client_id`
-- [ ] CRUD completo de leads
-- [ ] Status do lead: novo, em conversa, qualificado, transferido, perdido
-- [ ] Score de qualidade do lead (1–5)
+- ✅ 2026-04-18 Criar schema Supabase: `tenants`, `agents`, `leads`, `conversations`, `messages`
+- ✅ 2026-04-18 Ativar RLS em todas as tabelas com `tenant_id`
+- ✅ 2026-04-18 upsertLead(), updateLeadStatus(), scoreUp(), saveConversationMessages(), flagInactiveLeads()
+- ✅ 2026-04-18 Status do lead: novo → em_conversa → qualificado → transferido → em_negociacao → fechado
+- ✅ 2026-04-18 Score de qualidade do lead (1–5) com delta por intenção da IA
+- ✅ 2026-04-18 Integração no worker — leads e mensagens persistidos após cada atendimento
+- ✅ 2026-04-18 Dois modos de operação previstos no schema: shared / individual
 
 ### Sprint 4 — Análise de sentimento
 - [ ] Implementar análise de sentimento via Claude API por mensagem

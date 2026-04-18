@@ -10,9 +10,17 @@ import {
   popPendingMessages,
 } from './whatsapp.service'
 import { generateResponse } from '../ai-engine'
+import {
+  upsertLead,
+  updateLeadStatus,
+  scoreUp,
+  saveConversationMessages,
+  calcScoreDelta,
+} from '../leads'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
+import type { IncomingMessage } from '../leads'
 
 const HANDOFF_CHECK_DELAY_MS = 15 * 60 * 1000 // 15 minutos
 const HANDOFF_FLAG_TTL_SECONDS = 1800           // 30 minutos
@@ -116,11 +124,9 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
 
       // 3. Detectar perfil do lead pela última mensagem de texto
       const lastText = [...pendingMessages].reverse().find((m: { text: string | null }) => m.text)?.text ?? null
-      if (lastText) {
-        const profile = detectLeadProfile(lastText)
-        if (profile) {
-          console.log(`[Worker] Perfil detectado | profile=${profile} phone=${phone}`)
-        }
+      const detectedProfile = lastText ? detectLeadProfile(lastText) : null
+      if (detectedProfile) {
+        console.log(`[Worker] Perfil detectado | profile=${detectedProfile} phone=${phone}`)
       }
 
       // 4. Montar contexto para avaliação de transferência
@@ -182,9 +188,44 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
         await scheduleHandoffCheck(queue, data)
       }
 
-      // TODO Sprint 3: persistir mensagem e lead no Supabase
-      // await leadService.upsertLead({ tenantId, phone, profile, ... })
-      // await conversationService.saveMessages(pendingMessages)
+      // 9. Persistir lead e mensagens no Supabase
+      try {
+        const lead = await upsertLead({
+          tenantId,
+          phone,
+          profile: detectedProfile,
+          intent: aiResponse.intent,
+        })
+
+        await scoreUp(lead.id, tenantId, calcScoreDelta(aiResponse.intent))
+
+        if (aiResponse.shouldTransfer) {
+          await updateLeadStatus(lead.id, 'transferido', tenantId)
+        }
+
+        const incomingMessages: IncomingMessage[] = pendingMessages
+          .filter((m) => m.text || m.mediaUrl)
+          .map((m) => ({
+            zapiMessageId: `${data.messageId}-${m.timestamp}`,
+            content: m.text ?? '',
+            type: m.type,
+            mediaUrl: m.mediaUrl,
+          }))
+
+        await saveConversationMessages({
+          tenantId,
+          leadId: lead.id,
+          incomingMessages,
+          aiResponseText: aiResponse.text,
+          aiFailedAttempts: context.aiFailedAttempts,
+        })
+
+        console.log(`[Worker] Lead persistido | leadId=${lead.id} status=${lead.status} score=${lead.score}`)
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[Worker] Falha ao persistir no banco | ${msg}`)
+        // Não relança — falha de persistência não deve derrubar o atendimento
+      }
     },
     {
       connection: redisConnection,

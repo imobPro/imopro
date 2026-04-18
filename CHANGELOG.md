@@ -246,4 +246,41 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - [ ] Configurar ZAPI_TOKEN para testes com WhatsApp real
 - [ ] Avaliar integração Whisper para transcrição de áudio
 
+## [2026-04-18] — Sprint 3: CRM de leads
+
+**Fase:** Fase 1 — Backend central + atendimento WhatsApp
+**Duração:** 1 sessão
+
+### O que foi feito
+- Conduzida entrevista de negócio (skill `iniciar-sprint`) com 5 perguntas sobre o CRM
+- Criada migration SQL completa com schema de 5 tabelas e RLS em todas elas
+- Criado client Supabase singleton com service_role key
+- Criado módulo `leads` com tipos, serviço completo e exports
+- Integrado no worker: lead criado/atualizado, score incrementado, mensagens salvas após cada atendimento
+- Falha de persistência isolada — não derruba o atendimento
+
+### Arquivos criados
+- `migrations/001_initial_schema.sql` — DDL completo: enums, tenants, agents, leads, conversations, messages + RLS + índices
+- `src/shared/database/supabase.ts` — singleton Supabase com service_role key
+- `src/modules/leads/leads.types.ts` — Lead, LeadStatus, UpsertLeadParams, IncomingMessage
+- `src/modules/leads/leads.service.ts` — upsertLead, updateLeadStatus, scoreUp, saveConversationMessages, flagInactiveLeads, calcScoreDelta
+- `src/modules/leads/index.ts` — exports do módulo
+
+### Arquivos modificados
+- `src/modules/whatsapp/whatsapp.worker.ts` — TODOs Sprint 3 substituídos por chamadas reais ao leads.service
+- `PLAN.md` — Sprint 3 marcado como concluído
+
+### Decisões tomadas
+- `tenant_id` como chave de isolamento RLS em todas as tabelas (não `client_id` como estava escrito em alguns comentários antigos)
+- Dois modos de operação (`shared` / `individual`) previstos no campo `tenants.operation_mode`
+- Score incrementado por intenção: visita +2, compra/aluguel/venda +1 — nunca diminui automaticamente
+- `saveConversationMessages` usa `ON CONFLICT (zapi_message_id) DO NOTHING` para deduplicação de re-entregas
+- Falha no Supabase não derruba o atendimento — lead recebe resposta mesmo se banco estiver fora
+
+### Pendências para próxima sessão
+- [ ] Rodar migration no Supabase (SQL Editor)
+- [ ] Configurar SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no .env
+- [ ] Criar RPC `increment_lead_score` e `increment_conversation_count` no Supabase (usados no service)
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 4 — Análise de sentimento
+
 <!-- Adicione novas sessões acima desta linha -->
