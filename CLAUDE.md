@@ -58,15 +58,17 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 ```
 /imobpro
-  CLAUDE.md               ← este arquivo
+  CLAUDE.md               ← contexto central do projeto
   PRD.md                  ← requisitos do produto
-  PLAN.md                 ← roadmap de fases
-  CHANGELOG.md            ← registro do que foi construído
+  PLAN.md                 ← roadmap de fases e sprints
+  CHANGELOG.md            ← registro do que foi construído por sessão
   lessons.md              ← registro de erros e correções
   .gitignore
   .env.example
+  /migrations/
+    001_initial_schema.sql  ← schema completo: tenants, agents, leads, conversations, messages + RLS + RPCs
   /skills/
-    /iniciar-sprint/      ← entrevista de negócio antes de cada módulo
+    /iniciar-sprint/        ← entrevista de negócio antes de cada módulo
     /criar-modulo/
     /criar-migration/
     /integrar-zapi/
@@ -76,19 +78,38 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
     /seguranca/
     /melhorar-skills/
   /src/
+    index.ts                ← servidor Express (entry point)
     /modules/
-      /whatsapp/
-      /ai-engine/
-      /leads/
-      /sentiment/
-      /reports/
-      /tenants/
-      /auth/
+      /whatsapp/            ← Sprint 1 ✅ — webhook Z-API, fila BullMQ, worker, debounce 8s
+        whatsapp.types.ts
+        whatsapp.service.ts
+        whatsapp.controller.ts
+        whatsapp.routes.ts
+        whatsapp.worker.ts
+        index.ts
+      /ai-engine/           ← Sprint 2 ✅ — Claude API, Whisper, histórico, handoff 15min
+        ai-engine.types.ts
+        ai-engine.prompts.ts
+        ai-engine.service.ts
+        index.ts
+      /leads/               ← Sprint 3 ✅ — CRM, upsertLead, score, persistência Supabase
+        leads.types.ts
+        leads.service.ts
+        index.ts
+      /sentiment/           ← Sprint 4 🔲 — análise de sentimento por conversa
+      /reports/             ← Sprint 7 🔲 — relatórios automáticos em PDF
+      /tenants/             ← Sprint 5 🔲 — configurações por tenant
+      /auth/                ← Sprint 5 🔲 — autenticação Supabase Auth
     /shared/
       /database/
+        supabase.ts         ← client Supabase singleton (service_role)
       /queue/
+        queue.types.ts      ← WhatsAppMessageJob, MessageType
+        queues.ts           ← instância BullMQ
+        redis.ts            ← singleton ioredis
       /utils/
-  /frontend/
+        business-hours.ts   ← horário comercial configurável por tenant
+  /frontend/                ← Sprint 6 🔲 — Next.js (painel do cliente)
   /docs/
 ```
 
