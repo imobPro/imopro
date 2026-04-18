@@ -191,8 +191,33 @@ Regras obrigatórias para todos os system prompts e respostas geradas pelo agent
 - **Tom profissional e humanizado** — como um atendente bem treinado, não um robô nem um vendedor ansioso
 - **Usar o nome do corretor e do lead quando disponível** — personaliza sem ser invasivo
 - **Frases diretas e objetivas** — sem exagero de cordialidade, sem "Claro!", "Com certeza!", "Ótimo!"
-- **Áudio recebido do lead** — Claude API transcreve para texto e a IA responde normalmente, sem avisar o lead
+- **Áudio recebido do lead** — Whisper (OpenAI) transcreve para texto e a Claude API responde normalmente, sem avisar o lead
 - **Se transcrição de áudio vier confusa** — pedir para repetir com mensagem neutra: "Não consegui entender bem sua mensagem. Pode me enviar novamente ou escrever o que precisa?" (nunca mencionar qualidade do áudio)
+
+---
+
+## Modelos de operação — CRÍTICO para o schema do banco
+
+O sistema suporta dois modelos de uso, e o schema do banco deve ser capaz de representar ambos desde o Sprint 3:
+
+### Modelo 1 — Número único da imobiliária
+- A imobiliária tem **um único número WhatsApp** com vários corretores internos
+- Todos os leads chegam pelo mesmo número
+- A IA atende e, ao transferir, encaminha para o corretor correto internamente
+- Exemplo: "Imobiliária Silva" tem 5 corretores — todos atendem pelo mesmo número
+
+### Modelo 2 — Número individual por corretor
+- Cada corretor tem **seu próprio número WhatsApp** com IA ativa
+- O tenant é o corretor individual, não a imobiliária
+- Leads chegam diretamente para o corretor
+- Exemplo: "João Silva Corretor" tem seu número pessoal com IA
+
+### Implicações para o schema (Sprint 3)
+- A tabela `tenants` deve ter um campo `operation_mode: 'shared' | 'individual'`
+- No modo `shared`: a tabela `agents` (corretores) pertence ao tenant e leads podem ser atribuídos a um corretor específico
+- No modo `individual`: o próprio tenant é o corretor — tabela `agents` pode ter apenas 1 registro
+- O `client_id` (isolamento RLS) permanece no nível do tenant em ambos os modelos
+- Ao desenhar qualquer query ou migration que envolva corretores, sempre verificar qual modo está ativo
 
 ---
 
