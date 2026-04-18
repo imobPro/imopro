@@ -132,7 +132,9 @@ CREATE TABLE conversations (
   message_count      int NOT NULL DEFAULT 0,
   ai_failed_attempts int NOT NULL DEFAULT 0,
   started_at         timestamptz NOT NULL DEFAULT now(),
-  last_message_at    timestamptz NOT NULL DEFAULT now()
+  last_message_at    timestamptz NOT NULL DEFAULT now(),
+
+  UNIQUE (tenant_id, lead_id)   -- necessário para upsert por onConflict
 );
 
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
@@ -167,3 +169,29 @@ CREATE POLICY "messages_tenant_isolation" ON messages
 
 CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at);
 CREATE INDEX idx_messages_lead         ON messages(lead_id, created_at);
+
+-- -----------------------------------------------------------------------------
+-- RPCs — funções auxiliares chamadas pelo backend
+-- -----------------------------------------------------------------------------
+
+-- Incrementa score do lead com cap de 5
+CREATE OR REPLACE FUNCTION increment_lead_score(
+  p_lead_id   uuid,
+  p_tenant_id uuid,
+  p_delta     int
+) RETURNS void LANGUAGE sql AS $$
+  UPDATE leads
+  SET score = LEAST(5, score + p_delta)
+  WHERE id = p_lead_id
+    AND tenant_id = p_tenant_id;
+$$;
+
+-- Incrementa message_count de uma conversa
+CREATE OR REPLACE FUNCTION increment_conversation_count(
+  p_conversation_id uuid,
+  p_count           int
+) RETURNS void LANGUAGE sql AS $$
+  UPDATE conversations
+  SET message_count = message_count + p_count
+  WHERE id = p_conversation_id;
+$$;

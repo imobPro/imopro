@@ -1,5 +1,9 @@
 import type { IntentType } from '../ai-engine/ai-engine.types'
 import type { MessageType } from '../../shared/queue/queue.types'
+// LeadProfile é a fonte de verdade em whatsapp.types — importado e re-exportado daqui
+import type { LeadProfile as _LeadProfile } from '../whatsapp/whatsapp.types'
+export type { LeadProfile } from '../whatsapp/whatsapp.types'
+type LeadProfile = _LeadProfile
 
 export type LeadStatus =
   | 'novo'
@@ -8,14 +12,6 @@ export type LeadStatus =
   | 'transferido'
   | 'em_negociacao'
   | 'fechado'
-
-export type LeadProfile =
-  | 'comprador'
-  | 'inquilino'
-  | 'vendedor'
-  | 'captacao'
-  | 'investidor'
-  | 'indicador'
 
 export interface Lead {
   id: string
