@@ -8,6 +8,7 @@ export {
   getConversationStats,
   getConversationHistory,
   persistAiFailure,
+  updateConversationSentiment,
 } from './leads.service'
 
 export type {

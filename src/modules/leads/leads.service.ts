@@ -235,6 +235,29 @@ export async function getConversationHistory(
 }
 
 // -----------------------------------------------------------------------------
+// Atualiza o sentimento da conversa — sempre salvo após cada atendimento
+// -----------------------------------------------------------------------------
+
+export async function updateConversationSentiment(
+  tenantId: string,
+  leadId: string,
+  sentiment: 'positivo' | 'neutro' | 'negativo'
+): Promise<void> {
+  await supabase
+    .from('conversations')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        lead_id: leadId,
+        sentiment,
+        sentiment_updated_at: new Date().toISOString(),
+        last_message_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
+    )
+}
+
+// -----------------------------------------------------------------------------
 // Persiste a contagem de falhas da IA — chamado quando generateResponse lança
 // -----------------------------------------------------------------------------
 

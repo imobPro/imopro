@@ -58,9 +58,11 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ✅ 2026-04-18 Dois modos de operação previstos no schema: shared / individual
 
 ### Sprint 4 — Análise de sentimento
-- [ ] Implementar análise de sentimento via Claude API por mensagem
-- [ ] Registrar sentimento agregado por conversa
-- [ ] Alertar quando sentimento cair para negativo
+- ✅ 2026-04-19 Implementar análise de sentimento via Claude Haiku (tom geral da conversa)
+- ✅ 2026-04-19 Registrar sentimento agregado por conversa (coluna `sentiment` em `conversations`)
+- ✅ 2026-04-19 Alertar corretor via WhatsApp quando sentimento cair para negativo
+- ✅ 2026-04-19 Keywords de urgência máxima (vou desistir, quero cancelar etc.) com transferência imediata
+- ✅ 2026-04-19 Mensagem profissional de espera enviada ao lead antes do handoff por sentimento
 
 ### Entregável da Fase 1
 - Sistema recebendo mensagens, respondendo com IA e salvando leads no banco

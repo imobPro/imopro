@@ -158,12 +158,28 @@ const CLOSING_KEYWORDS = [
   'documentacao', 'contrato', 'tenho interesse', 'quero fechar',
 ]
 
+// Urgência máxima — insatisfação crítica: transferência imediata sem esperar análise de sentimento
+const URGENCY_KEYWORDS = [
+  'vou desistir', 'vou embora', 'quero cancelar', 'pessimo atendimento',
+  'horrivel', 'nunca mais', 'muito ruim', 'absurdo', 'inaceitavel',
+  'vou reclamar', 'procon', 'decepcionado', 'decepcionante',
+]
+
+function normalize(text: string): string {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function shouldTransferToHuman(context: ConversationContext): TransferReason | null {
-  const text = (context.lastText ?? '').toLowerCase()
+  const text = normalize(context.lastText ?? '')
 
   // Gatilho 1: pedido explícito
   if (TRANSFER_KEYWORDS.some(kw => text.includes(kw))) {
     return 'pedido_explicito'
+  }
+
+  // Gatilho 2: urgência máxima — insatisfação crítica imediata
+  if (URGENCY_KEYWORDS.some(kw => text.includes(normalize(kw)))) {
+    return 'sentimento_negativo'
   }
 
   // Gatilho 3: intenção de fechamento
@@ -186,9 +202,19 @@ export function shouldTransferToHuman(context: ConversationContext): TransferRea
     return 'fora_horario_comercial'
   }
 
-  // Gatilho 2: sentimento_negativo — avaliado pelo módulo de sentimento (Sprint 4)
-
   return null
+}
+
+// ---------------------------------------------------------------------------
+// Mensagens de sentimento — enviadas ao lead e ao corretor quando sentimento negativo
+// ---------------------------------------------------------------------------
+
+export function buildSentimentWaitMessage(): string {
+  return 'Só um momento, por favor. Estou verificando as informações para melhor atender você.'
+}
+
+export function buildCorretorAlert(leadPhone: string, tenantId: string): string {
+  return `[ImobPro] Atencao: o lead ${leadPhone} (tenant: ${tenantId}) demonstra insatisfacao na conversa. Acesse o painel para assumir o atendimento.`
 }
 
 // ---------------------------------------------------------------------------

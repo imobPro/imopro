@@ -8,6 +8,8 @@ import {
   getBusinessHoursMessage,
   buildZApiClient,
   popPendingMessages,
+  buildSentimentWaitMessage,
+  buildCorretorAlert,
 } from './whatsapp.service'
 import { generateResponse } from '../ai-engine'
 import {
@@ -19,11 +21,14 @@ import {
   getConversationStats,
   getConversationHistory,
   persistAiFailure,
+  updateConversationSentiment,
 } from '../leads'
+import { analyzeSentiment } from '../sentiment'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
-import type { ConversationContext } from './whatsapp.types'
+import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
 import type { IncomingMessage } from '../leads'
+import type { SentimentType } from '../sentiment'
 
 const HANDOFF_CHECK_DELAY_MS = 15 * 60 * 1000
 const HANDOFF_FLAG_TTL_SECONDS = 1800
@@ -62,6 +67,18 @@ async function clearHandoff(tenantId: string, phone: string): Promise<void> {
   await redisConnection.del(`handoff_active:${tenantId}:${phone}`)
 }
 
+async function alertCorretor(zapi: ZApiClient | null, leadPhone: string, tenantId: string): Promise<void> {
+  const corretorPhone = process.env.ZAPI_CORRETOR_PHONE
+  if (!zapi || !corretorPhone) return
+  try {
+    await zapi.sendText({ phone: corretorPhone, message: buildCorretorAlert(leadPhone, tenantId) })
+    console.log(`[Worker] Alerta enviado ao corretor | phone=${corretorPhone}`)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Worker] Falha ao alertar corretor | ${msg}`)
+  }
+}
+
 export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
   const queue = new Queue<WhatsAppMessageJob>(WHATSAPP_QUEUE_NAME, { connection: redisConnection })
 
@@ -96,11 +113,11 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
 
       // 2. Verificar horário comercial
       const withinHours = isWithinBusinessHours()
+      const instanceToken = process.env.ZAPI_TOKEN
+      const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
 
       if (!withinHours) {
-        const instanceToken = process.env.ZAPI_TOKEN
-        if (instanceToken) {
-          const zapi = buildZApiClient(instanceId, instanceToken)
+        if (zapi) {
           try {
             await zapi.sendText({ phone, message: getBusinessHoursMessage(tenantId) })
             console.log(`[Worker] Mensagem de fora de horário enviada | phone=${phone}`)
@@ -137,8 +154,7 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
 
       const history = await getConversationHistory(tenantId, lead.id).catch(() => [])
 
-      // 6. Verificar gatilhos de transferência antes da IA
-      // messageCount reflete o total real da conversa, não apenas o batch atual
+      // 6a. Verificar gatilhos de transferência (inclui urgência por keywords)
       const context: ConversationContext = {
         tenantId,
         phone,
@@ -149,16 +165,47 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       }
 
       const transferReason = shouldTransferToHuman(context)
-      if (transferReason && transferReason !== 'ia_sem_resposta') {
+      if (transferReason) {
         console.log(`[Worker] Transferência pré-IA | razão=${transferReason} phone=${phone}`)
+        if (transferReason === 'sentimento_negativo') {
+          if (zapi) {
+            await zapi.sendText({ phone, message: buildSentimentWaitMessage() }).catch((e: unknown) => {
+              const msg = e instanceof Error ? e.message : String(e)
+              console.error(`[Worker] Falha ao enviar mensagem de espera | ${msg}`)
+            })
+          }
+          await alertCorretor(zapi, phone, tenantId)
+          await updateConversationSentiment(tenantId, lead.id, 'negativo').catch(() => {})
+        }
         await scheduleHandoffCheck(queue, data)
         return
       }
 
+      // 6b. Análise de sentimento geral via Haiku (avalia tom acumulado da conversa)
+      let currentSentiment: SentimentType = 'neutro'
+      if (history.length >= 2) {
+        currentSentiment = await analyzeSentiment(history).catch(() => 'neutro' as SentimentType)
+        console.log(`[Worker] Sentimento | sentiment=${currentSentiment} phone=${phone}`)
+
+        if (currentSentiment === 'negativo') {
+          const alreadyInHandoff = await isHandoffActive(tenantId, phone)
+          if (!alreadyInHandoff) {
+            if (zapi) {
+              await zapi.sendText({ phone, message: buildSentimentWaitMessage() }).catch((e: unknown) => {
+                const msg = e instanceof Error ? e.message : String(e)
+                console.error(`[Worker] Falha ao enviar mensagem de espera | ${msg}`)
+              })
+            }
+            await alertCorretor(zapi, phone, tenantId)
+            await updateConversationSentiment(tenantId, lead.id, 'negativo').catch(() => {})
+            await scheduleHandoffCheck(queue, data)
+            return
+          }
+        }
+      }
+
       // 7. Gerar resposta via IA
       const config = getAgentConfig(tenantId)
-      const instanceToken = process.env.ZAPI_TOKEN
-      const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
 
       let aiResponse
       try {
@@ -167,7 +214,6 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
         const newFailCount = aiFailedAttempts + 1
         console.error(`[Worker] Falha na IA | tentativa=${newFailCount} phone=${phone}`)
 
-        // Persiste a contagem atualizada para que a próxima mensagem do lead acumule corretamente
         await persistAiFailure(tenantId, lead.id, newFailCount).catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e)
           console.error(`[Worker] Falha ao persistir aiFailedAttempts | ${msg}`)
@@ -221,15 +267,20 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
           leadId: lead.id,
           incomingMessages,
           aiResponseText: aiResponse.text,
-          aiFailedAttempts: 0, // zerado após resposta bem-sucedida
+          aiFailedAttempts: 0,
         })
 
         console.log(`[Worker] Lead persistido | leadId=${lead.id} status=${lead.status} score=${lead.score}`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[Worker] Falha ao persistir no banco | ${msg}`)
-        // Não relança — falha de persistência não deve derrubar o atendimento
       }
+
+      // 11. Persistir sentimento para o dashboard
+      await updateConversationSentiment(tenantId, lead.id, currentSentiment).catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[Worker] Falha ao persistir sentimento | ${msg}`)
+      })
     },
     {
       connection: redisConnection,
