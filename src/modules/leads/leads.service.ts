@@ -181,24 +181,79 @@ export async function saveConversationMessages(
 }
 
 // -----------------------------------------------------------------------------
-// Busca ai_failed_attempts da conversa ativa de um lead
-// Usado pelo worker para inicializar o contexto com o valor real persistido
+// Contexto da conversa ativa — aiFailedAttempts e messageCount persistidos
 // -----------------------------------------------------------------------------
 
-export async function getAiFailedAttempts(
+export async function getConversationStats(
   tenantId: string,
-  phone: string
-): Promise<number> {
+  leadId: string
+): Promise<{ aiFailedAttempts: number; messageCount: number }> {
   const { data } = await supabase
     .from('conversations')
-    .select('ai_failed_attempts, leads!inner(phone)')
+    .select('ai_failed_attempts, message_count')
     .eq('tenant_id', tenantId)
-    .eq('leads.phone', phone)
-    .order('last_message_at', { ascending: false })
-    .limit(1)
+    .eq('lead_id', leadId)
     .single()
 
-  return (data?.ai_failed_attempts as number | null) ?? 0
+  return {
+    aiFailedAttempts: (data?.ai_failed_attempts as number | null) ?? 0,
+    messageCount: (data?.message_count as number | null) ?? 0,
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Histórico das últimas N mensagens da conversa — alimenta o contexto da IA
+// -----------------------------------------------------------------------------
+
+export async function getConversationHistory(
+  tenantId: string,
+  leadId: string,
+  limit = 20
+): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('lead_id', leadId)
+    .single()
+
+  if (!conv) return []
+
+  const { data: messages } = await supabase
+    .from('messages')
+    .select('role, content')
+    .eq('conversation_id', (conv as { id: string }).id)
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (!messages || messages.length === 0) return []
+
+  return (messages as Array<{ role: string; content: string }>)
+    .reverse()
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+}
+
+// -----------------------------------------------------------------------------
+// Persiste a contagem de falhas da IA — chamado quando generateResponse lança
+// -----------------------------------------------------------------------------
+
+export async function persistAiFailure(
+  tenantId: string,
+  leadId: string,
+  aiFailedAttempts: number
+): Promise<void> {
+  await supabase
+    .from('conversations')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        lead_id: leadId,
+        ai_failed_attempts: aiFailedAttempts,
+        last_message_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
+    )
 }
 
 // -----------------------------------------------------------------------------

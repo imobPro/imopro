@@ -4,54 +4,32 @@ import { buildSystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
   AIResponse,
-  ConversationMessage,
   IntentType,
   PendingMessage,
 } from './ai-engine.types'
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY não definida no ambiente')
-}
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY não definida no ambiente')
-}
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-
 const MODEL = process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-sonnet-4-6'
-const MAX_HISTORY = 20
 const AUDIO_FALLBACK_MESSAGE =
   'Não consegui entender bem sua mensagem. Pode me enviar novamente ou escrever o que precisa?'
 
-// Histórico em memória — Sprint 3 substituirá por Supabase
-const conversationHistory = new Map<string, ConversationMessage[]>()
+// Clientes inicializados na primeira chamada — servidor sobe sem as chaves configuradas
+let anthropicClient: Anthropic | null = null
+let openaiClient: OpenAI | null = null
 
-function historyKey(tenantId: string, phone: string): string {
-  return `${tenantId}:${phone}`
-}
-
-export function getHistory(tenantId: string, phone: string): ConversationMessage[] {
-  return conversationHistory.get(historyKey(tenantId, phone)) ?? []
-}
-
-export function appendHistory(
-  tenantId: string,
-  phone: string,
-  message: ConversationMessage
-): void {
-  const key = historyKey(tenantId, phone)
-  const history = conversationHistory.get(key) ?? []
-  history.push(message)
-  // Sliding window: mantém apenas as últimas MAX_HISTORY mensagens
-  if (history.length > MAX_HISTORY) {
-    history.splice(0, history.length - MAX_HISTORY)
+function getAnthropic(): Anthropic {
+  if (!anthropicClient) {
+    if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY não definida')
+    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
-  conversationHistory.set(key, history)
+  return anthropicClient
 }
 
-export function clearHistory(tenantId: string, phone: string): void {
-  conversationHistory.delete(historyKey(tenantId, phone))
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não definida')
+    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return openaiClient
 }
 
 export async function transcribeAudio(
@@ -59,7 +37,8 @@ export async function transcribeAudio(
   mimeType: string
 ): Promise<string | null> {
   try {
-    // 1. Baixar o áudio da URL do Z-API
+    const openai = getOpenAI()
+
     const response = await fetch(mediaUrl)
     if (!response.ok) {
       console.error(`[AI] Falha ao baixar áudio | status=${response.status} url=${mediaUrl}`)
@@ -68,8 +47,6 @@ export async function transcribeAudio(
 
     const buffer = await response.arrayBuffer()
     const filename = `audio.${mimeType.split('/')[1] ?? 'ogg'}`
-
-    // 2. Enviar para o Whisper (OpenAI) como File
     const file = new File([buffer], filename, { type: mimeType })
 
     const result = await openai.audio.transcriptions.create({
@@ -88,9 +65,9 @@ export async function transcribeAudio(
   }
 }
 
-function detectIntent(text: string): IntentType {
+export function detectIntent(text: string): IntentType {
   const lower = text.toLowerCase()
-  if (/\b(comprar?|financiamento|entrada|minha casa)\b/.test(lower)) return 'compra'
+  if (/\b(comprar?|financiamento|entrada)\b/.test(lower)) return 'compra'
   if (/\b(alugar?|aluguel|locar?|locação)\b/.test(lower)) return 'aluguel'
   if (/\b(vender?|meu imóvel|preciso vender)\b/.test(lower)) return 'venda'
   if (/\b(visita|visitar?|conhecer o imóvel|agendar)\b/.test(lower)) return 'visita'
@@ -110,54 +87,40 @@ function parseTransfer(text: string): { cleanText: string; shouldTransfer: boole
 
 export async function generateResponse(
   pendingMessages: PendingMessage[],
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  config: AgentConfig,
   tenantId: string,
   phone: string,
-  config: AgentConfig
 ): Promise<AIResponse> {
-  const history = getHistory(tenantId, phone)
-
-  // Montar o conteúdo das mensagens do lead para este turno
   const userLines: string[] = []
 
   for (const msg of pendingMessages) {
     if (msg.type === 'audio' && msg.mediaUrl) {
       const transcription = await transcribeAudio(msg.mediaUrl, msg.mimeType ?? 'audio/ogg')
-      if (!transcription) {
-        // Retorna fallback imediatamente sem chamar a IA
-        return {
-          text: AUDIO_FALLBACK_MESSAGE,
-          intent: 'desconhecido',
-          shouldTransfer: false,
-        }
+      if (transcription) {
+        userLines.push(transcription)
       }
-      userLines.push(transcription)
+      // Áudio com falha na transcrição é ignorado — outras mensagens do batch continuam
     } else if (msg.text) {
       userLines.push(msg.text)
     }
   }
 
+  // Todos os itens do batch falharam ou eram mídia sem texto
   if (userLines.length === 0) {
-    return {
-      text: AUDIO_FALLBACK_MESSAGE,
-      intent: 'desconhecido',
-      shouldTransfer: false,
-    }
+    return { text: AUDIO_FALLBACK_MESSAGE, intent: 'desconhecido', shouldTransfer: false }
   }
 
   const userContent = userLines.join('\n')
 
-  // Montar mensagens para a API no formato histórico + nova mensagem
   const apiMessages: Anthropic.MessageParam[] = [
-    ...history.map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
+    ...history.map((m) => ({ role: m.role, content: m.content })),
     { role: 'user' as const, content: userContent },
   ]
 
   let rawText: string
   try {
-    const result = await anthropic.messages.create({
+    const result = await getAnthropic().messages.create({
       model: MODEL,
       max_tokens: 512,
       system: buildSystemPrompt(config),
@@ -174,10 +137,6 @@ export async function generateResponse(
 
   const { cleanText, shouldTransfer, transferReason } = parseTransfer(rawText)
   const intent = detectIntent(userContent)
-
-  // Persistir no histórico
-  appendHistory(tenantId, phone, { role: 'user', content: userContent, timestamp: Date.now() })
-  appendHistory(tenantId, phone, { role: 'assistant', content: cleanText, timestamp: Date.now() })
 
   console.log(`[AI] Resposta gerada | tenant=${tenantId} phone=${phone} intent=${intent} transfer=${shouldTransfer}`)
 

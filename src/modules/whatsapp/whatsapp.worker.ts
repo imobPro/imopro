@@ -16,19 +16,17 @@ import {
   scoreUp,
   saveConversationMessages,
   calcScoreDelta,
-  getAiFailedAttempts,
+  getConversationStats,
+  getConversationHistory,
+  persistAiFailure,
 } from '../leads'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
 import type { IncomingMessage } from '../leads'
 
-const HANDOFF_CHECK_DELAY_MS = 15 * 60 * 1000 // 15 minutos
-const HANDOFF_FLAG_TTL_SECONDS = 1800           // 30 minutos
-
-// ---------------------------------------------------------------------------
-// Configuração padrão do agente — Sprint 5 buscará do banco por tenant
-// ---------------------------------------------------------------------------
+const HANDOFF_CHECK_DELAY_MS = 15 * 60 * 1000
+const HANDOFF_FLAG_TTL_SECONDS = 1800
 
 function getAgentConfig(tenantId: string): AgentConfig {
   return {
@@ -37,10 +35,6 @@ function getAgentConfig(tenantId: string): AgentConfig {
     realtyName: process.env.REALTY_NAME ?? 'Imobiliária',
   }
 }
-
-// ---------------------------------------------------------------------------
-// Handoff: flag Redis + job de check após 15 minutos
-// ---------------------------------------------------------------------------
 
 async function scheduleHandoffCheck(
   queue: Queue<WhatsAppMessageJob>,
@@ -68,10 +62,6 @@ async function clearHandoff(tenantId: string, phone: string): Promise<void> {
   await redisConnection.del(`handoff_active:${tenantId}:${phone}`)
 }
 
-// ---------------------------------------------------------------------------
-// Worker principal
-// ---------------------------------------------------------------------------
-
 export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
   const queue = new Queue<WhatsAppMessageJob>(WHATSAPP_QUEUE_NAME, { connection: redisConnection })
 
@@ -81,13 +71,12 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       const data = job.data
       const { tenantId, phone, instanceId } = data
 
-      // Job de check de handoff — verifica se corretor assumiu
+      // Job de check de handoff
       if (data.jobId.startsWith('handoff-check:')) {
         const active = await isHandoffActive(tenantId, phone)
         if (active) {
           console.log(`[Worker] Corretor não assumiu | tenant=${tenantId} phone=${phone} — IA retoma`)
           await clearHandoff(tenantId, phone)
-          // Sprint 6: notificará pelo painel
           console.log(`[Worker] ALERTA CORRETOR: lead ${phone} (tenant ${tenantId}) sem atendimento após 15min`)
         } else {
           console.log(`[Worker] Handoff assumido pelo corretor | tenant=${tenantId} phone=${phone}`)
@@ -124,53 +113,74 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       }
 
       // 3. Detectar perfil do lead pela última mensagem de texto
-      const lastText = [...pendingMessages].reverse().find((m: { text: string | null }) => m.text)?.text ?? null
+      const lastText = [...pendingMessages].reverse().find((m) => m.text)?.text ?? null
       const detectedProfile = lastText ? detectLeadProfile(lastText) : null
       if (detectedProfile) {
         console.log(`[Worker] Perfil detectado | profile=${detectedProfile} phone=${phone}`)
       }
 
-      // 4. Montar contexto para avaliação de transferência
-      // aiFailedAttempts lido do banco para persistir entre mensagens diferentes
-      const aiFailedAttempts = await getAiFailedAttempts(tenantId, phone).catch(() => 0)
+      // 4. Upsert do lead — antecipado para ter leadId disponível nas etapas seguintes
+      let lead
+      try {
+        lead = await upsertLead({ tenantId, phone, profile: detectedProfile })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[Worker] Falha ao registrar lead | ${msg}`)
+        return
+      }
+
+      // 5. Carregar contexto e histórico persistidos no banco
+      const { aiFailedAttempts, messageCount } = await getConversationStats(tenantId, lead.id).catch(() => ({
+        aiFailedAttempts: 0,
+        messageCount: 0,
+      }))
+
+      const history = await getConversationHistory(tenantId, lead.id).catch(() => [])
+
+      // 6. Verificar gatilhos de transferência antes da IA
+      // messageCount reflete o total real da conversa, não apenas o batch atual
       const context: ConversationContext = {
         tenantId,
         phone,
-        messageCount: pendingMessages.length,
+        messageCount,
         lastText,
         aiFailedAttempts,
         isWithinBusinessHours: withinHours,
       }
 
-      // 5. Verificar gatilhos de transferência antes da IA
       const transferReason = shouldTransferToHuman(context)
       if (transferReason && transferReason !== 'ia_sem_resposta') {
         console.log(`[Worker] Transferência pré-IA | razão=${transferReason} phone=${phone}`)
         await scheduleHandoffCheck(queue, data)
-        // Sprint 6: notificará corretor pelo painel com resumo e razão
         return
       }
 
-      // 6. Gerar resposta via IA
+      // 7. Gerar resposta via IA
       const config = getAgentConfig(tenantId)
       const instanceToken = process.env.ZAPI_TOKEN
       const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
 
       let aiResponse
       try {
-        aiResponse = await generateResponse(pendingMessages, tenantId, phone, config)
+        aiResponse = await generateResponse(pendingMessages, history, config, tenantId, phone)
       } catch {
-        context.aiFailedAttempts += 1
-        console.error(`[Worker] Falha na IA | tentativa=${context.aiFailedAttempts} phone=${phone}`)
+        const newFailCount = aiFailedAttempts + 1
+        console.error(`[Worker] Falha na IA | tentativa=${newFailCount} phone=${phone}`)
 
-        if (context.aiFailedAttempts >= 2) {
+        // Persiste a contagem atualizada para que a próxima mensagem do lead acumule corretamente
+        await persistAiFailure(tenantId, lead.id, newFailCount).catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e)
+          console.error(`[Worker] Falha ao persistir aiFailedAttempts | ${msg}`)
+        })
+
+        if (newFailCount >= 2) {
           console.log(`[Worker] Transferência por ia_sem_resposta | phone=${phone}`)
           await scheduleHandoffCheck(queue, data)
         }
         return
       }
 
-      // 7. Enviar resposta ao lead
+      // 8. Enviar resposta ao lead
       if (zapi) {
         try {
           await zapi.sendText({ phone, message: aiResponse.text })
@@ -180,25 +190,17 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
           console.error(`[Worker] Falha ao enviar resposta | ${msg}`)
         }
       } else {
-        // Ambiente de desenvolvimento sem Z-API configurada
         console.log(`[Worker] [DEV] Resposta IA | phone=${phone}\n${aiResponse.text}`)
       }
 
-      // 8. Verificar se a IA sinalizou transferência
+      // 9. Verificar se a IA sinalizou transferência
       if (aiResponse.shouldTransfer) {
         console.log(`[Worker] Transferência via IA | razão=${aiResponse.transferReason ?? 'desconhecida'} phone=${phone}`)
         await scheduleHandoffCheck(queue, data)
       }
 
-      // 9. Persistir lead e mensagens no Supabase
+      // 10. Persistir score, status e mensagens no Supabase
       try {
-        const lead = await upsertLead({
-          tenantId,
-          phone,
-          profile: detectedProfile,
-          intent: aiResponse.intent,
-        })
-
         await scoreUp(lead.id, tenantId, calcScoreDelta(aiResponse.intent))
 
         if (aiResponse.shouldTransfer) {
@@ -219,7 +221,7 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
           leadId: lead.id,
           incomingMessages,
           aiResponseText: aiResponse.text,
-          aiFailedAttempts: context.aiFailedAttempts,
+          aiFailedAttempts: 0, // zerado após resposta bem-sucedida
         })
 
         console.log(`[Worker] Lead persistido | leadId=${lead.id} status=${lead.status} score=${lead.score}`)

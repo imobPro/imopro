@@ -10,7 +10,7 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 ## Status atual
 
 **Fase:** 1 — Backend central + atendimento WhatsApp
-**Próximo passo:** Sprint 2 — Motor de IA (rodar skill `iniciar-sprint` antes)
+**Próximo passo:** Sprint 4 — Análise de sentimento (rodar skill `iniciar-sprint` antes)
 
 ---
 
