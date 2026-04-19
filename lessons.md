@@ -58,4 +58,58 @@ Quando Arthur fizer uma correção, adicionar uma entrada seguindo o formato:
 
 ---
 
+## [2026-04-19] — Histórico de conversa em Map de memória
+
+**Contexto:** ai-engine.service.ts — conversationHistory armazenado em Map<string, ConversationMessage[]>
+**O que estava errado:** Map em memória é perdido em qualquer restart do servidor (deploy no Railway) e não funciona com múltiplas instâncias. A IA perdia o contexto de toda conversa em andamento a cada deploy.
+**O que foi corrigido:** Histórico lido do Supabase via `getConversationHistory(tenantId, leadId)`. Worker carrega antes de chamar `generateResponse` e passa como parâmetro. `getHistory/appendHistory/clearHistory` removidos.
+**Regra para não repetir:** Nunca usar Map/variável de módulo para estado de sessão por usuário. Estado que precisa sobreviver a restarts vai no banco ou no Redis.
+
+---
+
+## [2026-04-19] — Contador de falhas da IA não persistia entre mensagens
+
+**Contexto:** whatsapp.worker.ts — `context.aiFailedAttempts += 1` dentro do catch do generateResponse
+**O que estava errado:** O incremento era feito na variável local do job. Como o job retornava sem salvar, o banco ficava com o valor antigo. A lógica "2 falhas → transferir" nunca funcionava entre mensagens diferentes.
+**O que foi corrigido:** `persistAiFailure(tenantId, leadId, newCount)` chamado no catch antes do return. Salva no banco imediatamente.
+**Regra para não repetir:** Qualquer contador/flag que precise acumular entre jobs separados deve ser persistido no banco ANTES do return, não depois.
+
+---
+
+## [2026-04-19] — messageCount media tamanho do batch, não total da conversa
+
+**Contexto:** whatsapp.worker.ts — `context.messageCount = pendingMessages.length`
+**O que estava errado:** `pendingMessages.length` é o número de mensagens no burst de 8s (debounce). O gatilho "5+ mensagens sem resolução" disparava para qualquer lead que enviasse 5 mensagens rápidas na primeira interação.
+**O que foi corrigido:** `messageCount` vem de `getConversationStats(tenantId, leadId).messageCount` — total real da tabela `conversations`.
+**Regra para não repetir:** Ao usar contadores de negócio (mensagens, tentativas, etc.), sempre carregar do banco. Dados do job/fila são efêmeros e representam apenas o evento atual.
+
+---
+
+## [2026-04-19] — OPENAI_API_KEY lançava erro na importação do módulo
+
+**Contexto:** ai-engine.service.ts — `throw new Error('OPENAI_API_KEY não definida')` no topo do arquivo
+**O que estava errado:** O check era executado na importação. Servidor não subia em desenvolvimento sem a chave da OpenAI, mesmo sem nenhum áudio para transcrever.
+**O que foi corrigido:** Clientes Anthropic e OpenAI com lazy init — instanciados na primeira chamada via `getAnthropic()` / `getOpenAI()`.
+**Regra para não repetir:** Checks de variáveis de ambiente obrigatórias ficam no entry point (`src/index.ts`) ou dentro da função que usa a variável — nunca no topo de módulos importados por outros módulos.
+
+---
+
+## [2026-04-19] — Áudio com falha descartava texto do mesmo batch
+
+**Contexto:** ai-engine.service.ts — `return AUDIO_FALLBACK_MESSAGE` dentro do loop de pendingMessages
+**O que estava errado:** Se um áudio falhava na transcrição e o lead havia enviado texto no mesmo burst de 8s, o `return` antecipado descartava o texto. A intenção do lead se perdia.
+**O que foi corrigido:** Loop continua após falha de áudio (`continue` implícito). Fallback só retorna se `userLines.length === 0` ao final do loop (todos falharam).
+**Regra para não repetir:** Em loops de processamento de batch, nunca fazer `return` dentro do loop por falha de um item. Coletar erros e decidir no final.
+
+---
+
+## [2026-04-19] — "minha casa" causava falso positivo em intenção de compra
+
+**Contexto:** ai-engine.service.ts — regex `/\b(comprar?|financiamento|entrada|minha casa)\b/`
+**O que estava errado:** "minha casa" é ambíguo — aparece em "preciso vender minha casa" (intenção=venda) mas o regex retornava "compra". O teste `detecta venda` falhou com esse caso.
+**O que foi corrigido:** "minha casa" removido do regex de compra. Era genérico demais para ser discriminador.
+**Regra para não repetir:** Keywords de intenção devem ser específicas o suficiente para não capturar frases do sentido oposto. Testar com frases negativas (o que NÃO deve capturar) além das positivas.
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

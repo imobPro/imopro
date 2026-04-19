@@ -283,4 +283,63 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - [ ] Criar RPC `increment_lead_score` e `increment_conversation_count` no Supabase (usados no service)
 - [ ] Rodar skill `iniciar-sprint` antes do Sprint 4 — Análise de sentimento
 
+## [2026-04-19] — Revisão geral + Sprint 4: Análise de sentimento
+
+**Fase:** 1 — Backend central + atendimento WhatsApp
+**Duração:** 1 sessão
+
+### O que foi feito
+
+#### Revisão e correção de bugs críticos (pré-Sprint 4)
+- Histórico de conversa migrado de Map em memória para Supabase (`getConversationHistory`)
+- Contador `aiFailedAttempts` agora persiste no banco via `persistAiFailure` — antes zerava a cada nova mensagem
+- `messageCount` no gatilho de transferência corrigido: usa total real da conversa, não tamanho do batch de 8s
+- `OPENAI_API_KEY` e `ANTHROPIC_API_KEY` com lazy init — servidor sobe sem as chaves configuradas
+- Batch de áudio corrigido: falha de transcrição não descarta mais mensagens de texto do mesmo burst
+- Bug no regex `detectIntent`: `"minha casa"` causava falso positivo em intenção de compra para frases de venda
+- `vitest.config.ts` corrigido: usa `setupFiles` existente e exclui `dist/`
+- Novo teste: `detectIntent` cobre todos os tipos de intenção (44 testes passando)
+- `PLAN.md` atualizado: próximo passo corrigido para Sprint 4
+
+#### Sprint 4 — Análise de sentimento
+- Conduzida entrevista de negócio (skill `iniciar-sprint`) com 5 perguntas sobre sentimento
+- Dois mecanismos complementares implementados:
+  1. Keywords de urgência imediata (vou desistir, quero cancelar, péssimo atendimento etc.) → transferência instantânea via `shouldTransferToHuman`
+  2. Tom geral via Claude Haiku — avalia padrão acumulado de ≥2 mensagens do lead
+- Quando sentimento negativo: IA envia mensagem profissional de espera + alerta WhatsApp ao corretor + handoff agendado (15min)
+- Se corretor não assumir em 15min: IA retoma (comportamento já existente)
+- `sentiment` e `sentiment_updated_at` persistidos em `conversations` para o dashboard
+- Índice parcial `WHERE sentiment='negativo'` para consultas rápidas no painel
+- Migrations 001 e 002 rodadas com sucesso no Supabase
+
+### Arquivos criados
+- `migrations/002_add_sentiment.sql` — coluna sentiment + índice parcial
+- `src/modules/sentiment/sentiment.types.ts` — SentimentType
+- `src/modules/sentiment/sentiment.service.ts` — analyzeSentiment via Haiku
+- `src/modules/sentiment/index.ts` — exports do módulo
+- `src/tests/sentiment.service.test.ts` — urgency keywords, wait message, corretor alert
+- `src/tests/ai-engine.service.test.ts` — detectIntent
+
+### Arquivos modificados
+- `src/modules/ai-engine/ai-engine.service.ts` — lazy init, sem Map em memória, fix batch de áudio, detectIntent exportado
+- `src/modules/ai-engine/index.ts` — exports atualizados
+- `src/modules/leads/leads.service.ts` — getConversationStats, getConversationHistory, updateConversationSentiment, persistAiFailure (substituiu getAiFailedAttempts)
+- `src/modules/leads/index.ts` — exports atualizados
+- `src/modules/whatsapp/whatsapp.service.ts` — URGENCY_KEYWORDS, normalize(), buildSentimentWaitMessage, buildCorretorAlert
+- `src/modules/whatsapp/whatsapp.worker.ts` — upsertLead antecipado, histórico do banco, passos 6a/6b de sentimento, persistência de sentimento no passo 11
+- `vitest.config.ts` — criado com setupFiles e exclude corretos
+- `.env.example` — ZAPI_CORRETOR_PHONE adicionado
+- `PLAN.md` — Sprint 4 marcado como concluído
+
+### Decisões tomadas
+- Sentimento avalia tom geral (não por mensagem) — Haiku precisa de ≥2 mensagens do lead
+- ZAPI_CORRETOR_PHONE em .env por ora — Sprint 5 moverá para banco junto com configs do tenant
+- Alerta ao corretor não dispara se handoff já estiver ativo (evita spam)
+- Memórias permanentes criadas em `.claude/projects/` para contexto entre sessões
+
+### Pendências para próxima sessão
+- [ ] Configurar ZAPI_CORRETOR_PHONE no .env (aguardando plano pago Z-API)
+- [ ] Testar fluxo completo com WhatsApp real (junto com testes Z-API)
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 5 — Autenticação e multi-tenant
+
 <!-- Adicione novas sessões acima desta linha -->
