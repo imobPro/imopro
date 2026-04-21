@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 1 — Backend central + atendimento WhatsApp
-**Próximo passo:** Sprint 4 — Análise de sentimento (rodar skill `iniciar-sprint` antes)
+**Fase:** 1 — Backend central + atendimento WhatsApp (última sprint concluída: 5)
+**Próximo passo:** Sprint 6 — Dashboard Next.js (rodar skill `iniciar-sprint` antes)
 
 ---
 
@@ -75,9 +75,11 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 **Status:** 🔲 Não iniciado
 
 ### Sprint 5 — Autenticação e multi-tenant
-- [ ] Supabase Auth — login por imobiliária
-- [ ] Middleware de tenant no backend (extrai `client_id` do JWT)
-- [ ] Proteger todas as rotas com autenticação
+- ✅ 2026-04-21 Supabase Auth (e-mail + senha, reset self-service, sessão 30d) — backend only; frontend em Sprint 6
+- ✅ 2026-04-21 Middleware `requireAuth` extrai `tenantId` e `agentId` do JWT via lookup em `agents`
+- ✅ 2026-04-21 Migration 003: `agents.user_id` + `agents.active` + RLS reescrito com `auth.uid()`
+- ✅ 2026-04-21 Módulo `agents` e `getHandoffTargetPhone` — `ZAPI_CORRETOR_PHONE` removido do .env
+- ✅ 2026-04-21 `GET /api/me` + `HttpError`/`errorHandler` + augmentation de `req.auth`
 
 ### Sprint 6 — Dashboard
 - [ ] Setup Next.js com Tailwind

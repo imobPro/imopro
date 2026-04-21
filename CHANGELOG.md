@@ -342,4 +342,55 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - [ ] Testar fluxo completo com WhatsApp real (junto com testes Z-API)
 - [ ] Rodar skill `iniciar-sprint` antes do Sprint 5 — Autenticação e multi-tenant
 
+## [2026-04-21] — Sprint 5: Autenticação e multi-tenant
+
+**Fase:** 1 — Backend central + atendimento WhatsApp
+**Duração:** 1 sessão
+
+### O que foi feito
+- Conduzida entrevista de negócio (skill `iniciar-sprint`) com 8 perguntas sobre autenticação e modelo de usuários
+- Migration 003: `agents.user_id` (FK auth.users) + `agents.active` (soft delete) + índices parciais
+- Políticas RLS reescritas para usar subquery em `agents` (auth.uid) em vez de claim `tenant_id` que nunca era setado — prepara o Sprint 6 Realtime
+- Middleware `requireAuth` com verificação local HS256 do JWT Supabase (sem round-trip), validação de `aud=authenticated` e `iss` do projeto
+- Middleware `requireZapiToken` extraído do controller, usando `crypto.timingSafeEqual`
+- Módulo `agents` com `findActiveAgentByUserId` e `getHandoffTargetPhone` (lead.agent_id com fallback pro primeiro ativo do tenant)
+- Módulo `auth` com `GET /api/me` devolvendo `{ userId, email, tenantId, agentId }`
+- Infra compartilhada: `HttpError`, `errorHandler` e augmentation do Express `req.auth`
+- Worker passou a usar `getHandoffTargetPhone` — `ZAPI_CORRETOR_PHONE` foi aposentado
+- Rate limit separado para `/webhook` (mais permissivo) e `/api`
+- Suíte de testes subiu de 44 para 60 (novos: `agents.service`, `auth.middleware`)
+
+### Arquivos criados
+- `migrations/003_auth_and_assignment.sql`
+- `src/shared/errors/http-error.ts` — classe `HttpError(status, code, message)`
+- `src/shared/errors/error-handler.ts` — error middleware Express
+- `src/shared/types/express.d.ts` — `req.auth` via module augmentation
+- `src/shared/middleware/auth.ts` — `requireAuth`
+- `src/shared/middleware/zapi-token.ts` — `requireZapiToken`
+- `src/modules/agents/{agents.types.ts,agents.service.ts,index.ts}`
+- `src/modules/auth/{auth.controller.ts,auth.routes.ts,index.ts}`
+- `src/tests/agents.service.test.ts`
+- `src/tests/auth.middleware.test.ts`
+
+### Arquivos modificados
+- `src/index.ts` — monta `requireZapiToken` em `/webhook`, `requireAuth` + `/api` router, `errorHandler` no final
+- `src/modules/whatsapp/whatsapp.controller.ts` — check de token removido (middleware agora)
+- `src/modules/whatsapp/whatsapp.worker.ts` — `alertCorretor` consome `getHandoffTargetPhone(tenantId, leadId)`
+- `src/shared/utils/validate-env.ts` — `SUPABASE_JWT_SECRET` obrigatório
+- `src/tests/setup.ts` — `SUPABASE_JWT_SECRET` fixture
+- `.env.example` — adiciona `SUPABASE_JWT_SECRET`, remove `ZAPI_CORRETOR_PHONE` e `JWT_SECRET`/`JWT_EXPIRES_IN` obsoletos
+
+### Decisões tomadas
+- Verificação local HS256 do JWT: evita network round-trip por request, canonical Supabase pattern para backend
+- Client Supabase segue em service-role — per-request anon+JWT foi deliberadamente adiado; middleware + `tenantId` explícito continuam como porta única
+- `agents.active` com soft delete preserva histórico de leads atendidos por ex-corretores
+- Handoff não aborta atendimento: se não há corretor ativo, loga warning e segue
+- Frontend do Sprint 6 autentica via `supabase.auth.signInWithPassword()` e envia `Authorization: Bearer ${session.access_token}` — backend só valida, não emite JWT
+
+### Pendências para próxima sessão
+- [ ] Rodar `migrations/003_auth_and_assignment.sql` no Supabase
+- [ ] Coletar `SUPABASE_JWT_SECRET` (Settings → API → JWT Secret) e adicionar no `.env`
+- [ ] Criar manualmente no Supabase dashboard: 1 tenant + 1 user em `auth.users` + 1 agent com `user_id` preenchido
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 6 — Dashboard Next.js
+
 <!-- Adicione novas sessões acima desta linha -->

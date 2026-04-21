@@ -24,6 +24,7 @@ import {
   updateConversationSentiment,
 } from '../leads'
 import { analyzeSentiment } from '../sentiment'
+import { getHandoffTargetPhone } from '../agents'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
@@ -67,12 +68,21 @@ async function clearHandoff(tenantId: string, phone: string): Promise<void> {
   await redisConnection.del(`handoff_active:${tenantId}:${phone}`)
 }
 
-async function alertCorretor(zapi: ZApiClient | null, leadPhone: string, tenantId: string): Promise<void> {
-  const corretorPhone = process.env.ZAPI_CORRETOR_PHONE
-  if (!zapi || !corretorPhone) return
+async function alertCorretor(
+  zapi: ZApiClient | null,
+  leadPhone: string,
+  tenantId: string,
+  leadId: string
+): Promise<void> {
+  if (!zapi) return
+  const target = await getHandoffTargetPhone(tenantId, leadId)
+  if (!target) {
+    console.warn(`[Handoff] tenant=${tenantId} sem corretor ativo para alertar | lead=${leadPhone}`)
+    return
+  }
   try {
-    await zapi.sendText({ phone: corretorPhone, message: buildCorretorAlert(leadPhone, tenantId) })
-    console.log(`[Worker] Alerta enviado ao corretor | phone=${corretorPhone}`)
+    await zapi.sendText({ phone: target.phone, message: buildCorretorAlert(leadPhone, tenantId) })
+    console.log(`[Worker] Alerta enviado ao corretor | agent=${target.agentId} phone=${target.phone}`)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[Worker] Falha ao alertar corretor | ${msg}`)
@@ -174,7 +184,7 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
               console.error(`[Worker] Falha ao enviar mensagem de espera | ${msg}`)
             })
           }
-          await alertCorretor(zapi, phone, tenantId)
+          await alertCorretor(zapi, phone, tenantId, lead.id)
           await updateConversationSentiment(tenantId, lead.id, 'negativo').catch(() => {})
         }
         await scheduleHandoffCheck(queue, data)
@@ -196,7 +206,7 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
                 console.error(`[Worker] Falha ao enviar mensagem de espera | ${msg}`)
               })
             }
-            await alertCorretor(zapi, phone, tenantId)
+            await alertCorretor(zapi, phone, tenantId, lead.id)
             await updateConversationSentiment(tenantId, lead.id, 'negativo').catch(() => {})
             await scheduleHandoffCheck(queue, data)
             return

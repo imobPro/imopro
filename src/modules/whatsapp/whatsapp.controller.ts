@@ -31,16 +31,8 @@ const ZApiWebhookSchema = z.object({
 const IGNORED_STATUSES = ['DELIVERY_ACK', 'READ', 'PLAYED', 'DELETED', 'PENDING', 'SERVER_ACK']
 
 export async function receiveWebhook(req: Request, res: Response): Promise<void> {
-  // 1. Validação de token
-  const clientToken = req.headers['client-token']
-  const expectedToken = process.env.ZAPI_CLIENT_TOKEN
+  // Validação do token é feita pelo middleware requireZapiToken (antes de chegar aqui)
 
-  if (!expectedToken || clientToken !== expectedToken) {
-    res.status(401).json({ error: 'Token inválido' })
-    return
-  }
-
-  // 2. Validação do payload com Zod
   const parsed = ZApiWebhookSchema.safeParse(req.body)
   if (!parsed.success) {
     console.warn('[Webhook] Payload inválido:', parsed.error.flatten().fieldErrors)
@@ -51,26 +43,22 @@ export async function receiveWebhook(req: Request, res: Response): Promise<void>
 
   const payload = parsed.data
 
-  // 3. Ignorar mensagens enviadas pelo próprio número
   if (payload.fromMe) {
     res.status(200).json({ received: true, action: 'ignored_from_me' })
     return
   }
 
-  // 4. Ignorar eventos de status (leitura, entrega, etc.)
   if (IGNORED_STATUSES.includes(payload.status)) {
     res.status(200).json({ received: true, action: 'ignored_status_event' })
     return
   }
 
-  // 5. Ignorar mensagens de grupos
   if (payload.isGroup) {
     res.status(200).json({ received: true, action: 'ignored_group' })
     return
   }
 
-  // 6. tenantId vem do instanceId da Z-API (cada tenant tem sua instância)
-  // Sprint 5 vai buscar o tenantId via JWT — por ora usa o instanceId direto
+  // tenantId vem do instanceId da Z-API (cada tenant tem sua instância)
   const tenantId = payload.instanceId
 
   try {

@@ -96,19 +96,29 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
         leads.types.ts
         leads.service.ts
         index.ts
-      /sentiment/           ← Sprint 4 🔲 — análise de sentimento por conversa
+      /sentiment/           ← Sprint 4 ✅ — análise de sentimento (urgency + Haiku)
+      /agents/              ← Sprint 5 ✅ — lookup de agent por user, handoff target
+      /auth/                ← Sprint 5 ✅ — GET /api/me
       /reports/             ← Sprint 7 🔲 — relatórios automáticos em PDF
-      /tenants/             ← Sprint 5 🔲 — configurações por tenant
-      /auth/                ← Sprint 5 🔲 — autenticação Supabase Auth
+      /tenants/             ← Sprint 8 🔲 — configurações por tenant
     /shared/
       /database/
         supabase.ts         ← client Supabase singleton (service_role)
+      /errors/
+        http-error.ts       ← HttpError(status, code, message)
+        error-handler.ts    ← Express error middleware
+      /middleware/
+        auth.ts             ← requireAuth (JWT Supabase HS256 + lookup agent)
+        zapi-token.ts       ← requireZapiToken (timingSafeEqual)
       /queue/
         queue.types.ts      ← WhatsAppMessageJob, MessageType
         queues.ts           ← instância BullMQ
         redis.ts            ← singleton ioredis
+      /types/
+        express.d.ts        ← augmentation de req.auth
       /utils/
         business-hours.ts   ← horário comercial configurável por tenant
+        validate-env.ts     ← checagem de env vars obrigatórias no boot
   /frontend/                ← Sprint 6 🔲 — Next.js (painel do cliente)
   /docs/
 ```
