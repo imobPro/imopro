@@ -112,4 +112,20 @@ Quando Arthur fizer uma correção, adicionar uma entrada seguindo o formato:
 
 ---
 
+## [2026-04-23] — Migration commitada no Git ≠ migration aplicada no Supabase
+
+**Contexto:** Sprint 6 — rodei a migration 004 (RLS por ownership) e o Supabase retornou "column `user_id` does not exist on agents". Mas no repositório tanto a migration 003 quanto o backend (`agents.service.ts`) referenciavam `user_id`. Nada inconsistente no código.
+**O que estava errado:** A migration 003 nunca foi rodada no SQL Editor do Supabase. O Sprint 5 foi commitado com o código que dependia de `agents.user_id` e `agents.active`, mas o SQL só foi escrito no arquivo — ninguém clicou em "Run". A 004 batia numa tabela `agents` ainda no estado da migration 001.
+**O que foi corrigido:** Aplicada a 003 primeiro e depois a 004. Nenhuma mudança no código.
+**Regra para não repetir:** Ao commitar qualquer migration nova, registrar explicitamente em CHANGELOG.md se ela já foi aplicada no Supabase ou não. Antes de construir qualquer feature que dependa de colunas/policies da migration, rodar a query de diagnóstico abaixo e comparar com o que o arquivo da migration declara. Se "column does not exist" aparecer e o código referencia a coluna, a primeira hipótese é migration não aplicada, não typo no código.
+
+```sql
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public' AND table_name = '<tabela>'
+ORDER BY ordinal_position;
+```
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->
