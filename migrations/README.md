@@ -8,6 +8,8 @@ Aplique em ordem crescente no Supabase: **Dashboard → SQL Editor → colar cad
 | 002 | `002_add_sentiment.sql` | Colunas `sentiment` + `sentiment_updated_at` em `conversations` |
 | 003 | `003_auth_and_assignment.sql` | `agents.user_id` + `agents.active` + RLS reescrito via `auth.uid()` |
 | 004 | `004_leads_ownership_rls.sql` | RLS "próprios + sem dono" em leads/conversations/messages + REPLICA IDENTITY FULL |
+| 005 | `005_agents_self_policy.sql` | **Tentativa falha** — mantida no histórico, a recursão não se resolve com OR de policies permissivas. Substituída pela 006. |
+| 006 | `006_rls_helper_functions.sql` | Quebra recursão infinita da RLS via funções `SECURITY DEFINER` (`auth_tenant_ids`, `auth_agent_ids`). Reescreve todas as policies pra usar os helpers. |
 
 ## Criar primeiro usuário de teste (Sprint 6)
 

@@ -128,4 +128,13 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-04-23] — Recursão infinita em RLS que referencia a própria tabela
+
+**Contexto:** Sprint 6 — as policies das migrations 003 e 004 usavam subqueries do tipo `SELECT tenant_id FROM agents WHERE user_id = auth.uid() AND active = true` dentro da própria RLS de `agents` (e também nas policies de leads/conversations/messages que leem agents). Com o frontend logando via JWT do usuário pela primeira vez, o Postgres aplicava a RLS ao subquery, que aplicava de novo, e assim por diante. Resultado: "infinite recursion detected in policy for relation agents" — o `maybeSingle()` engolia o erro e o painel mostrava "Conta sem imobiliária vinculada" mesmo com o agent linkado corretamente.
+**O que estava errado:** Duas coisas em sequência. Primeiro, escrevi as policies sem perceber que o subquery recursivo geraria loop na primeira leitura do próprio usuário. Depois, tentei "quebrar" a recursão na migration 005 adicionando uma policy permissiva `user_id = auth.uid()` — falhou porque o PG avalia **todas** as policies permissivas antes de combinar com OR, e o erro da recursiva aborta a query inteira antes da OR acontecer.
+**O que foi corrigido:** Migration 006 — funções `auth_tenant_ids()` e `auth_agent_ids()` com `SECURITY DEFINER` + `search_path` fixo. SECURITY DEFINER bypassa RLS durante a execução da função. Policies reescritas chamando as funções em vez de subqueries recursivas. GRANT EXECUTE só pra role `authenticated`.
+**Regra para não repetir:** Sempre que uma policy RLS precisar consultar a tabela que ela protege (ou qualquer tabela cuja policy também consulte esta), encapsular o lookup em função `SECURITY DEFINER` com `STABLE`, `search_path = public, pg_temp` e GRANT EXECUTE restrito. Nunca confiar que "múltiplas policies permissivas combinam por OR" resolve recursão — elas são avaliadas antes da combinação, e qualquer erro em uma delas aborta a query. Validar policies novas rodando `SELECT * FROM <tabela>` como role `authenticated` antes de subir (via `SET LOCAL ROLE authenticated` no SQL Editor).
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

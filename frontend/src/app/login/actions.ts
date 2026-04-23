@@ -20,7 +20,18 @@ export async function signInAction(
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "E-mail ou senha inválidos." };
+    // Em produção mostra mensagem genérica; em dev ajuda a diagnosticar
+    // credenciais vs. rede vs. config de Auth.
+    console.error("[signInAction] Supabase auth error:", {
+      status: error.status,
+      code: error.code,
+      message: error.message,
+    });
+    const detail =
+      process.env.NODE_ENV === "production"
+        ? "E-mail ou senha inválidos."
+        : `[${error.code ?? error.status}] ${error.message}`;
+    return { error: detail };
   }
 
   redirect("/inbox");
