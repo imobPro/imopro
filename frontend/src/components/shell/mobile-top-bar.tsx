@@ -1,5 +1,6 @@
 import { LogOut } from "lucide-react";
 import { signOutAction } from "@/app/login/actions";
+import { ThemeToggle } from "./theme-toggle";
 
 export function MobileTopBar({ agentName }: { agentName: string }) {
   return (
@@ -11,15 +12,18 @@ export function MobileTopBar({ agentName }: { agentName: string }) {
         </span>
       </div>
 
-      <form action={signOutAction}>
-        <button
-          type="submit"
-          aria-label="Sair"
-          className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:bg-muted transition-colors"
-        >
-          <LogOut className="size-4" />
-        </button>
-      </form>
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            aria-label="Sair"
+            className="inline-flex items-center justify-center size-8 rounded-md text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </form>
+      </div>
     </header>
   );
 }

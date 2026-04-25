@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOutAction } from "@/app/login/actions";
+import { ThemeToggle } from "./theme-toggle";
 
 export function SidebarNav({ agentName }: { agentName: string }) {
   const pathname = usePathname();
@@ -42,15 +43,18 @@ export function SidebarNav({ agentName }: { agentName: string }) {
         })}
       </nav>
 
-      <form action={signOutAction} className="px-3 py-4 border-t">
-        <button
-          type="submit"
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 transition-colors"
-        >
-          <LogOut className="size-4" />
-          Sair
-        </button>
-      </form>
+      <div className="flex items-center justify-between gap-2 px-3 py-4 border-t">
+        <form action={signOutAction} className="flex-1">
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 transition-colors"
+          >
+            <LogOut className="size-4" />
+            Sair
+          </button>
+        </form>
+        <ThemeToggle />
+      </div>
     </aside>
   );
 }

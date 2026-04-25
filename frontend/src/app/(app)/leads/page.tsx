@@ -1,12 +1,32 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentAgent } from "@/lib/queries/agents";
+import { getLeadsForTenant } from "@/lib/queries/leads";
+import { LeadsList } from "./leads-list";
+import { NewLeadsBanner } from "./new-leads-banner";
+
 export const metadata = { title: "Leads — ImobPro" };
 
-export default function LeadsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LeadsPage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const agent = await getCurrentAgent(supabase, user.id);
+  if (!agent) redirect("/login");
+
+  const loadedAt = new Date().toISOString();
+  const leads = await getLeadsForTenant(supabase, agent.tenantId);
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-semibold">Leads</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Em construção — será preenchida na próxima etapa do Sprint 6.
-      </p>
-    </div>
+    <>
+      <NewLeadsBanner tenantId={agent.tenantId} loadedAt={loadedAt} />
+      <LeadsList initialLeads={leads} />
+    </>
   );
 }

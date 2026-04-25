@@ -1,37 +1,54 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const DISMISS_KEY = "imobpro:notif-banner-dismissed";
 
-export function NotificationBanner() {
-  const [status, setStatus] = useState<NotificationPermission | "unsupported">(
-    "default",
-  );
-  const [dismissed, setDismissed] = useState(true); // começa oculto até hidratar
+type Status = NotificationPermission | "unsupported";
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) {
-      setStatus("unsupported");
-      return;
-    }
-    setStatus(Notification.permission);
-    setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
-  }, []);
+function readPermission(): Status {
+  if (typeof window === "undefined") return "default";
+  if (!("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
+function readDismissed(): boolean {
+  if (typeof window === "undefined") return true;
+  return sessionStorage.getItem(DISMISS_KEY) === "1";
+}
+
+const noopSubscribe = () => () => {};
+
+export function NotificationBanner() {
+  const remoteStatus = useSyncExternalStore<Status>(
+    noopSubscribe,
+    readPermission,
+    () => "default",
+  );
+  const remoteDismissed = useSyncExternalStore<boolean>(
+    noopSubscribe,
+    readDismissed,
+    () => true,
+  );
+
+  const [statusOverride, setStatusOverride] = useState<Status | null>(null);
+  const [dismissedOverride, setDismissedOverride] = useState<boolean | null>(null);
+
+  const status = statusOverride ?? remoteStatus;
+  const dismissed = dismissedOverride ?? remoteDismissed;
 
   if (status !== "default" || dismissed) return null;
 
   async function request() {
     const result = await Notification.requestPermission();
-    setStatus(result);
+    setStatusOverride(result);
   }
 
   function dismiss() {
     sessionStorage.setItem(DISMISS_KEY, "1");
-    setDismissed(true);
+    setDismissedOverride(true);
   }
 
   return (
