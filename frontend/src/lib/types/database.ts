@@ -36,9 +36,28 @@ export type Lead = {
   profile: LeadProfile | null;
   intent: IntentType | null;
   last_message_at: string | null;
+  last_viewed_at: string | null;
   created_at: string;
 };
 
 export type LeadWithConversation = Lead & {
   conversations: { sentiment: Sentiment | null }[];
+};
+
+export type MessageRole = "user" | "assistant";
+export type MessageType =
+  | "text"
+  | "audio"
+  | "image"
+  | "document"
+  | "sticker"
+  | "location";
+
+export type ChatMessage = {
+  id: string;
+  role: MessageRole;
+  content: string;
+  type: MessageType;
+  media_url: string | null;
+  created_at: string;
 };

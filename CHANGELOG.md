@@ -36,6 +36,49 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-04-25] — Sprint 6 (parte 3): Tela de conversa do lead
+
+**Fase:** Fase 2 — Painel web
+**Duração:** sessão única
+
+### O que foi feito
+- Tela `/inbox/[leadId]` (read-only, layout 2 lados, scroll-to-bottom no mount)
+- Bolha de mensagem renderiza por type: text, audio (player), image, document, sticker, location
+- Header sticky com avatar, nome, telefone, **Status selector** (dropdown radio), **Editar perfil** (Dialog com nome/região/perfil) e atalho **Abrir no WhatsApp** (`wa.me`)
+- Histórico carrega últimos 7 dias por padrão; link `?expanded=1` carrega tudo
+- Marca "visto" implícito no render: `markAsViewedAction` grava `last_viewed_at`
+- `inbox/page.tsx` virou placeholder funcional ("Selecione um lead na aba Leads")
+
+### Arquivos criados ou modificados
+- `migrations/007_lead_view_state.sql` — `leads.last_viewed_at` (per-tenant; evolui pra per-agent quando shared mode for relevante). **Aplicada no Supabase em 2026-04-25.**
+- `migrations/README.md` — entrada da 007
+- `frontend/src/lib/types/database.ts` — adicionado `last_viewed_at`, `MessageRole`, `MessageType`, `ChatMessage`
+- `frontend/src/lib/queries/leads.ts` — novo `getLeadById`, `LEAD_COLUMNS` extraído
+- `frontend/src/lib/queries/messages.ts` — novo `getMessagesForLead(supabase, leadId, sinceDays?)`
+- `frontend/src/lib/domain/relative-time.ts` — `formatAbsoluteTime`, `formatDayHeader`
+- `frontend/src/app/(app)/inbox/[leadId]/page.tsx` — server component, auth → agent → lead → messages → markAsViewed
+- `frontend/src/app/(app)/inbox/[leadId]/actions.ts` — `updateStatusAction`, `updateLeadProfileAction`, `markAsViewedAction`
+- `frontend/src/app/(app)/inbox/[leadId]/chat-header.tsx` — header sticky com ações
+- `frontend/src/app/(app)/inbox/[leadId]/chat-messages.tsx` — lista, agrupamento por dia, scroll-to-bottom
+- `frontend/src/app/(app)/inbox/[leadId]/message-bubble.tsx` — renderização por tipo
+- `frontend/src/app/(app)/inbox/[leadId]/status-selector.tsx` — dropdown radio
+- `frontend/src/app/(app)/inbox/[leadId]/lead-edit-dialog.tsx` — modal de edição
+- `frontend/src/app/(app)/inbox/page.tsx` — placeholder do tab raiz
+
+### Decisões tomadas
+- **Read-only por enquanto** — corretor responde no celular via WhatsApp; envio pelo painel fica pra sprint futuro
+- **Layout 2 lados sem distinguir IA de corretor** — IA e respostas humanas (futuras) ficam ambas à direita como "imobiliária". Mais limpo, alinhado com como o lead vê
+- **Mutations via Server Actions** — segue o padrão único existente (`login/actions.ts`); RLS valida via JWT, não precisa passar tenantId
+- **`last_viewed_at` per-tenant**, não per-agent — limitação consciente documentada na migration; evolui pra tabela `lead_views(lead_id, agent_id, viewed_at)` quando shared mode pesar
+- **Paginação via `?expanded=1`** — searchParam, sem state cliente
+
+### Pendências para próxima sessão
+- [ ] Teste end-to-end com Z-API real (assinatura ainda não comprada)
+- [ ] Telas restantes do Sprint 6: Métricas (`/metricas`) e Funil (`/funil`)
+- [ ] Indicador "não lido" na Lista de Leads (last_viewed_at < last_message_at) — opcional
+
+---
+
 ## [2026-04-03] — Planejamento inicial do projeto
 
 **Fase:** Fase 0 — Setup

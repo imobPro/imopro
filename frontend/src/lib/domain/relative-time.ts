@@ -36,6 +36,51 @@ export function formatPhoneBR(phone: string): string {
   return phone;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function formatAbsoluteTime(input: string | Date | null, now: Date = new Date()): string {
+  if (!input) return "";
+  const date = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(date.getTime())) return "";
+
+  const hhmm = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+  if (isSameDay(date, now)) return hhmm;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(date, yesterday)) return `ontem ${hhmm}`;
+
+  const dd = pad2(date.getDate());
+  const mm = pad2(date.getMonth() + 1);
+  return `${dd}/${mm} ${hhmm}`;
+}
+
+export function formatDayHeader(input: string | Date, now: Date = new Date()): string {
+  const date = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(date.getTime())) return "";
+
+  if (isSameDay(date, now)) return "Hoje";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameDay(date, yesterday)) return "Ontem";
+
+  const dd = pad2(date.getDate());
+  const mm = pad2(date.getMonth() + 1);
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
 export function initialsFrom(name: string | null, phone: string): string {
   if (name && name.trim().length > 0) {
     const parts = name.trim().split(/\s+/);
