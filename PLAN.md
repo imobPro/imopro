@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 1 — Backend central + atendimento WhatsApp (última sprint concluída: 5)
-**Próximo passo:** Sprint 6 — Dashboard Next.js (rodar skill `iniciar-sprint` antes)
+**Fase:** 2 — Painel web (última sprint concluída: 6)
+**Próximo passo:** Sprint 7 — Relatórios automáticos em PDF (rodar skill `iniciar-sprint` antes)
 
 ---
 
@@ -82,12 +82,12 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - ✅ 2026-04-21 `GET /api/me` + `HttpError`/`errorHandler` + augmentation de `req.auth`
 
 ### Sprint 6 — Dashboard
-- [ ] Setup Next.js com Tailwind
-- [ ] Tela de login
-- [ ] Dashboard: leads hoje, semana, mês
-- [ ] Gráfico de funil de conversão
-- [ ] Lista de leads com filtros e busca
-- [ ] Tela de detalhes do lead com histórico de conversa
+- ✅ 2026-04-22 Setup Next.js 16 (Turbopack) + Tailwind v4 + shell mobile-first
+- ✅ 2026-04-23 Tela de login + middleware Supabase SSR
+- ✅ 2026-04-26 Dashboard: leads hoje/7d/30d em `/metricas` (+ qualificados, fechados, parados)
+- ✅ 2026-04-26 Gráfico de funil de conversão em `/funil` (kanban, 6 colunas, mobile colapsável)
+- ✅ 2026-04-24 Lista de leads com filtros colapsáveis e busca
+- ✅ 2026-04-25 Tela de detalhes do lead com histórico de conversa (`/inbox/[leadId]`)
 
 ### Sprint 7 — Relatórios automáticos
 - [ ] Função de geração de relatório mensal em PDF

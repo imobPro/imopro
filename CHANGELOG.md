@@ -36,6 +36,45 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-04-26] — Sprint 6 (parte 4 e 5): Métricas e Funil — Sprint 6 fechado
+
+**Fase:** Fase 2 — Painel web
+**Duração:** sessão única
+
+### O que foi feito
+- Tela `/metricas` com 3 cartões: Leads novos (hoje/7d/30d), Em fechamento (qualificados/fechados do mês) e Leads parados (sem msg há mais de 7d e ainda não fechados, com tone warning quando > 0)
+- 6 contagens em paralelo via `count: "exact", head: true` — sem trazer linhas, só contadores. `countSafe` isola erros em zero pra não derrubar a tela
+- Tela `/funil` em formato kanban com 6 colunas seguindo `STATUS_ORDER`. Mobile: cada coluna é accordion colapsável. Desktop: scroll horizontal, colunas de 18rem
+- Card mini do funil mostra nome, telefone formatado e `formatRelative(last_message_at)` — clique abre `/inbox/[leadId]`
+- Limite de 20 leads por status no funil com aviso "Mostrando os 20 mais recentes" quando atingido
+- Commit anterior pendente da parte 3 também foi aplicado nesta sessão (`/inbox/[leadId]` read-only + migration 007)
+
+### Arquivos criados ou modificados
+- `frontend/src/app/(app)/metricas/page.tsx` — server component com auth → agent → metrics
+- `frontend/src/app/(app)/metricas/metric-card.tsx` — variantes highlight (com tone) e rows
+- `frontend/src/lib/queries/metrics.ts` — `getMetrics`, 6 contagens em paralelo, helpers `startOfTodayISO` e `daysAgoISO`
+- `frontend/src/app/(app)/funil/page.tsx` — server component com auth → agent → funnel
+- `frontend/src/app/(app)/funil/funnel-board.tsx` — wrapper que mapeia `STATUS_ORDER`
+- `frontend/src/app/(app)/funil/funnel-column.tsx` — coluna colapsável (`useState`) no mobile
+- `frontend/src/app/(app)/funil/lead-card-mini.tsx` — card compacto que linka pra inbox
+- `frontend/src/lib/queries/funnel.ts` — `getLeadsGroupedByStatus` reusa `LEAD_COLUMNS` da query de leads
+- `PLAN.md` — Sprint 6 marcado como concluído, fase atual atualizada para 2
+
+### Decisões tomadas
+- **Métricas usa `created_at` para qualificados/fechados** — não temos histórico de mudança de status. Limitação documentada na própria UI; evolui quando a tabela `lead_status_history` existir
+- **Funil paralelo, não sequencial** — 6 queries `Promise.all` em vez de 1 query agregada. Mais simples, mais legível, RLS bate em cada uma. Para tenants pequenos isso é negligível
+- **Limite por coluna em 20** — proteção contra colunas gigantes de "novo" estourarem altura. Opção `?expanded=1` pode ser adicionada se virar dor
+- **Mobile colapsável, desktop sempre aberto** — `md:flex` força aberto no desktop mesmo com `open=false` virando "hidden" via classe condicional
+- **`countSafe` isola erros** — falha de uma contagem retorna 0, dashboard não derruba inteiro
+
+### Pendências para próxima sessão
+- [ ] Validação visual real no browser (autenticado) das duas telas — eu não consigo fazer
+- [ ] Resolver lockfiles duplicados (`package-lock.json` na raiz e em `frontend/`)
+- [ ] Indicador "não lido" na Lista de Leads (`last_viewed_at < last_message_at`) — opcional
+- [ ] Rodar skill `iniciar-sprint` antes do Sprint 7 — Relatórios automáticos em PDF
+
+---
+
 ## [2026-04-25] — Sprint 6 (parte 3): Tela de conversa do lead
 
 **Fase:** Fase 2 — Painel web
