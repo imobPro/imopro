@@ -3,20 +3,29 @@ import type { AuthAgent, HandoffTarget } from './agents.types'
 
 /**
  * Busca o agent ativo vinculado a um usuário autenticado.
- * Retorna null se o usuário não tem agent ou se o agent está inativo.
+ * - Lança AgentLookupError quando o banco falha (caller deve devolver 500)
+ * - Retorna null quando o usuário simplesmente não tem agent ativo (caller devolve 403)
  */
+export class AgentLookupError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'AgentLookupError'
+  }
+}
+
 export async function findActiveAgentByUserId(userId: string): Promise<AuthAgent | null> {
   const { data, error } = await supabase
     .from('agents')
     .select('id, tenant_id, active')
     .eq('user_id', userId)
+    .eq('active', true)
     .maybeSingle()
 
   if (error) {
     console.error(`[Agents] findActiveAgentByUserId falhou: ${error.message}`)
-    return null
+    throw new AgentLookupError(error.message)
   }
-  if (!data || data.active !== true) return null
+  if (!data) return null
 
   return {
     id: data.id as string,

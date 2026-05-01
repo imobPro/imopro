@@ -5,7 +5,11 @@ vi.mock('../shared/database/supabase', () => ({
 }))
 
 import { supabase } from '../shared/database/supabase'
-import { getHandoffTargetPhone, findActiveAgentByUserId } from '../modules/agents/agents.service'
+import {
+  getHandoffTargetPhone,
+  findActiveAgentByUserId,
+  AgentLookupError,
+} from '../modules/agents/agents.service'
 
 type QueryResult = { data: unknown; error: unknown }
 
@@ -113,18 +117,8 @@ describe('findActiveAgentByUserId', () => {
     expect(result).toEqual({ id: 'agent-1', tenantId: 'tenant-A', active: true })
   })
 
-  it('retorna null quando o agent está inativo', async () => {
-    queueFromResponses({
-      data: { id: 'agent-1', tenant_id: 'tenant-A', active: false },
-      error: null,
-    })
-
-    const result = await findActiveAgentByUserId('user-1')
-
-    expect(result).toBeNull()
-  })
-
-  it('retorna null quando o user não tem agent', async () => {
+  it('retorna null quando o user não tem agent ativo', async () => {
+    // Query agora filtra por active=true direto no banco, então o resultado é simplesmente "no rows"
     queueFromResponses({ data: null, error: null })
 
     const result = await findActiveAgentByUserId('user-x')
@@ -132,11 +126,9 @@ describe('findActiveAgentByUserId', () => {
     expect(result).toBeNull()
   })
 
-  it('retorna null em caso de erro do Supabase', async () => {
+  it('lança AgentLookupError em caso de erro do Supabase', async () => {
     queueFromResponses({ data: null, error: { message: 'boom' } })
 
-    const result = await findActiveAgentByUserId('user-1')
-
-    expect(result).toBeNull()
+    await expect(findActiveAgentByUserId('user-1')).rejects.toBeInstanceOf(AgentLookupError)
   })
 })

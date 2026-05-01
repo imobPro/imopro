@@ -87,7 +87,9 @@ export async function scoreUp(
   })
 
   if (error) {
-    // Fallback: busca score atual e atualiza
+    // Fallback não-atômico: read-then-write. Logar é importante para detectar regressão da RPC.
+    console.error(`[Leads] scoreUp RPC falhou — usando fallback não-atômico | leadId=${leadId} erro=${error.message}`)
+
     const { data: lead } = await supabase
       .from('leads')
       .select('score')
@@ -188,12 +190,18 @@ export async function getConversationStats(
   tenantId: string,
   leadId: string
 ): Promise<{ aiFailedAttempts: number; messageCount: number }> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('conversations')
     .select('ai_failed_attempts, message_count')
     .eq('tenant_id', tenantId)
     .eq('lead_id', leadId)
-    .single()
+    .maybeSingle()
+
+  // Conversation pode não existir ainda na 1ª mensagem do lead — não é erro.
+  // PGRST116 = "no rows" (caso ocorra mesmo com maybeSingle, ignoramos).
+  if (error && error.code !== 'PGRST116') {
+    console.error(`[Leads] getConversationStats falhou | leadId=${leadId} erro=${error.message}`)
+  }
 
   return {
     aiFailedAttempts: (data?.ai_failed_attempts as number | null) ?? 0,
@@ -210,16 +218,20 @@ export async function getConversationHistory(
   leadId: string,
   limit = 20
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
-  const { data: conv } = await supabase
+  const { data: conv, error: convError } = await supabase
     .from('conversations')
     .select('id')
     .eq('tenant_id', tenantId)
     .eq('lead_id', leadId)
-    .single()
+    .maybeSingle()
 
+  if (convError) {
+    console.error(`[Leads] getConversationHistory: lookup conversation falhou | leadId=${leadId} erro=${convError.message}`)
+    return []
+  }
   if (!conv) return []
 
-  const { data: messages } = await supabase
+  const { data: messages, error: msgError } = await supabase
     .from('messages')
     .select('role, content')
     .eq('conversation_id', (conv as { id: string }).id)
@@ -227,6 +239,10 @@ export async function getConversationHistory(
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  if (msgError) {
+    console.error(`[Leads] getConversationHistory: lookup messages falhou | leadId=${leadId} erro=${msgError.message}`)
+    return []
+  }
   if (!messages || messages.length === 0) return []
 
   return (messages as Array<{ role: string; content: string }>)
@@ -243,7 +259,7 @@ export async function updateConversationSentiment(
   leadId: string,
   sentiment: 'positivo' | 'neutro' | 'negativo'
 ): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('conversations')
     .upsert(
       {
@@ -255,6 +271,10 @@ export async function updateConversationSentiment(
       },
       { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
     )
+
+  if (error) {
+    console.error(`[Leads] updateConversationSentiment falhou | leadId=${leadId} erro=${error.message}`)
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -266,7 +286,7 @@ export async function persistAiFailure(
   leadId: string,
   aiFailedAttempts: number
 ): Promise<void> {
-  await supabase
+  const { error } = await supabase
     .from('conversations')
     .upsert(
       {
@@ -277,6 +297,11 @@ export async function persistAiFailure(
       },
       { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
     )
+
+  if (error) {
+    // Crítico: lição 070 — sem persistir, "2 falhas → transferir" não dispara entre jobs
+    console.error(`[Leads] persistAiFailure falhou | leadId=${leadId} erro=${error.message}`)
+  }
 }
 
 // -----------------------------------------------------------------------------

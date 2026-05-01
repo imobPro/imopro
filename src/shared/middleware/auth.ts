@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express'
 import jwt from 'jsonwebtoken'
-import { findActiveAgentByUserId } from '../../modules/agents'
+import { findActiveAgentByUserId, AgentLookupError } from '../../modules/agents'
 
 interface SupabaseJwtPayload {
   sub: string
@@ -44,7 +44,17 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     return
   }
 
-  const agent = await findActiveAgentByUserId(payload.sub)
+  let agent
+  try {
+    agent = await findActiveAgentByUserId(payload.sub)
+  } catch (err) {
+    if (err instanceof AgentLookupError) {
+      res.status(500).json({ error: { code: 'AGENT_LOOKUP_FAILED', message: 'Falha ao consultar corretor' } })
+      return
+    }
+    throw err
+  }
+
   if (!agent) {
     res.status(403).json({ error: { code: 'NO_ACTIVE_AGENT', message: 'Usuário sem corretor ativo vinculado' } })
     return
@@ -52,7 +62,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
 
   req.auth = {
     userId: payload.sub,
-    email: payload.email ?? '',
+    email: payload.email ?? null,
     tenantId: agent.tenantId,
     agentId: agent.id,
   }
