@@ -137,4 +137,67 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-04-26] — `jobId` cru no BullMQ deduplica também contra jobs em retenção
+
+**Contexto:** whatsapp.service.ts — `enqueueMessage` usava `queue.add(jobId, data, { jobId, delay })` para debounce de 8s, com `removeOnComplete: 100` na fila.
+**O que estava errado:** `jobId` cru bloqueia novos `add` enquanto o job estiver em qualquer estado, incluindo completed retidos por `removeOnComplete`. Em pouca movimentação, o segundo burst de mensagens do mesmo lead virava no-op silencioso — a mensagem entrava na lista Redis (`pending:`) mas nenhum worker era acionado para drená-la. Resultado: lead manda burst → IA responde → próximo burst do mesmo lead fica órfão até o slot rotacionar.
+**O que foi corrigido:** Substituído por `deduplication: { id, ttl, extend: true, replace: true }` (modo debounce oficial do BullMQ). O id volta a estar livre assim que o job sai da fila. Validado contra docs do Context7 (`/taskforcesh/bullmq`).
+**Regra para não repetir:** Para debounce/throttle, sempre usar a opção `deduplication` do BullMQ, nunca `jobId` cru. `jobId` é para identificação humana e não foi desenhado para deduplicação confiável quando há retenção de completed/failed.
+
+---
+
+## [2026-04-26] — `lockDuration` default (30s) menor que duração real do pipeline IA
+
+**Contexto:** whatsapp.worker.ts — Worker iniciado sem `lockDuration` explícito. O job interno chama Whisper, Claude Sonnet, Haiku (sentimento), múltiplas queries Supabase e Z-API.
+**O que estava errado:** Pipeline real costuma passar de 30s, especialmente quando há áudio. BullMQ auto-renova lock na metade do intervalo, mas qualquer glitch de rede no renew faz o job virar `stalled` → re-processado → IA responde duas vezes ao mesmo lead.
+**O que foi corrigido:** `lockDuration: 120_000` no Worker.
+**Regra para não repetir:** Sempre dimensionar `lockDuration` com base no P99 real do pipeline + margem. Para qualquer Worker que faça chamadas a múltiplos serviços externos (LLM, transcrição, banco), default 30s é insuficiente. Mensurar antes, não depois.
+
+---
+
+## [2026-04-26] — `attempts > 1` em job que envia mensagem ao lead sem idempotência
+
+**Contexto:** queues.ts — `defaultJobOptions: { attempts: 3, backoff: exponential }` para a fila `whatsapp-messages`.
+**O que estava errado:** Se o job concluísse `zapi.sendText` (lead já recebeu a resposta) mas falhasse depois (ex.: erro ao persistir no Supabase), o BullMQ retentava do zero — o lead recebia a mesma resposta múltiplas vezes.
+**O que foi corrigido:** `attempts: 1` no job principal. Job de `handoff-check` (idempotente — só lê uma flag Redis) recebe `attempts: 3` localmente.
+**Regra para não repetir:** Retry automático só pode ser habilitado em jobs comprovadamente idempotentes. Mensagens com side effect externo (envio ao usuário, cobrança, e-mail) precisam de flag de "já entregue" no banco antes que retries voltem a ser seguros. Se a idempotência ainda não está implementada, `attempts: 1` é a opção segura.
+
+---
+
+## [2026-04-26] — `result.content[0]` do Anthropic SDK acessado sem optional chaining
+
+**Contexto:** ai-engine.service.ts — `result.content[0].type` sem `?.` após `messages.create`.
+**O que estava errado:** Embora raro, `content` pode vir como array vazio (refusal, edge cases). Sem optional chaining, vira "Cannot read properties of undefined (reading 'type')" — exception não tratada que sobe pelo worker.
+**O que foi corrigido:** `block?.type === 'text' ? block.text : ''`.
+**Regra para não repetir:** Acesso a primeiro elemento de array vindo de SDK externo sempre com optional chaining. SDKs evoluem e responses raros podem aparecer.
+
+---
+
+## [2026-04-26] — `parseTransfer` aceitava qualquer razão sem whitelist
+
+**Contexto:** ai-engine.service.ts — regex `/\[TRANSFER:([^\]]+)\]/` retornava qualquer string como `transferReason`.
+**O que estava errado:** O system prompt define 3 razões válidas (`pedido_explicito`, `intencao_fechamento`, `ia_sem_resposta`), mas se a IA alucinasse `[TRANSFER:lead_chato]`, o handoff disparava com razão inválida e o downstream tratava como handoff legítimo.
+**O que foi corrigido:** Whitelist `VALID_TRANSFER_REASONS` checada antes de retornar `shouldTransfer: true`. Razão fora da lista → `shouldTransfer: false` e o texto limpo é entregue normalmente. Tipo `TransferReason` adicionado em `ai-engine.types.ts`.
+**Regra para não repetir:** Qualquer marcador estruturado extraído de output de LLM (tags, comandos, classificações) precisa validar contra whitelist explícita. LLM eventualmente alucina formato — a fronteira de confiança fica no parser, não no prompt.
+
+---
+
+## [2026-04-26] — Erros de Supabase silenciados em massa no leads.service
+
+**Contexto:** leads.service.ts — `getConversationStats`, `getConversationHistory`, `updateConversationSentiment`, `persistAiFailure` faziam `await supabase.from(...)` ignorando o `error` retornado, ou usavam `.catch(() => default)` no caller.
+**O que estava errado:** Em produção, qualquer indisponibilidade do Supabase virava "tudo zerado/vazio" sem rastro nos logs. Sintoma silencioso típico: lead recebe IA respondendo do zero como se fosse a 1ª mensagem (porque `getConversationHistory` retornou `[]`). Pior: `persistAiFailure` engolido faz a lógica "2 falhas → transferir" parar de funcionar entre jobs.
+**O que foi corrigido:** Cada chamada agora inspeciona `error` e loga `console.error` com `leadId` antes de retornar default. `single()` substituído por `maybeSingle()` em queries que podem legitimamente não ter linha.
+**Regra para não repetir:** Toda chamada Supabase deve inspecionar `error`. `.catch(() => default)` no caller esconde a causa raiz. Quando o default for parte do contrato (ex.: "primeira mensagem do lead → histórico vazio"), checar pelo código específico (`PGRST116` = no rows) em vez de engolir tudo.
+
+---
+
+## [2026-04-26] — `findActiveAgentByUserId` mascarava falha de banco como "sem corretor vinculado"
+
+**Contexto:** middleware/auth.ts — chamava `findActiveAgentByUserId` e retornava 403 `NO_ACTIVE_AGENT` quando o resultado era `null`.
+**O que estava errado:** A função retornava `null` em duas situações distintas: (1) o usuário realmente não tem agent ativo, (2) a query Supabase falhou. Em produção com Supabase indisponível, todos os usuários autenticados viam "Conta sem imobiliária vinculada" — diagnóstico ruim que disfarça o incidente como problema de cadastro.
+**O que foi corrigido:** Criada `AgentLookupError` no service. Falha de banco lança a exceção; ausência legítima retorna `null`. Middleware diferencia: 500 `AGENT_LOOKUP_FAILED` vs 403 `NO_ACTIVE_AGENT`. Filtro `active=true` movido para a query (em vez de filtrar em memória).
+**Regra para não repetir:** `null` em retorno deve significar uma única coisa (ausência legítima do recurso). Falha de infraestrutura é exceção, não null. Quando o caller precisa decidir entre 500 e 4xx, a distinção tem que vir do callee — não do `error` engolido.
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

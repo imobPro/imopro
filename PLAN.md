@@ -94,11 +94,33 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - [ ] Cron job para disparar no dia 1 de cada mês
 - [ ] Envio automático por e-mail
 - [ ] Histórico de relatórios no painel para download
+- [ ] Integrar `flagInactiveLeads` em cron diário (função existe no service, sem agendamento)
 
 ### Sprint 8 — Configurações do agente
 - [ ] Tela de configurações: nome do agente, mensagem de boas-vindas
 - [ ] Configuração de horário de atendimento (fora do horário: mensagem automática)
 - [ ] Toggle para ativar/desativar o agente
+- [ ] `getAgentConfig` no worker passa a buscar nome/imobiliária por tenant (hoje vem de `process.env`, descarta `tenantId`)
+- [ ] `getBusinessHoursMessage` por tenant (hoje ignora `tenantId` com `void`)
+- [ ] Token Z-API por tenant — hoje compartilhado via `process.env.ZAPI_TOKEN`, quebra com 2º cliente
+
+---
+
+## Backlog técnico — pós-revisão de 2026-04-26
+
+Itens identificados na revisão dos módulos críticos com Context7. Não bloqueiam Sprint 7, mas devem entrar no roadmap de hardening.
+
+### Segurança / Auth
+- [ ] **JWT HS256 → JWKS (RS256/ECC)** — recomendação oficial Supabase para projetos novos. Migrar `auth.ts` de `jsonwebtoken` HS256 para `jose` + `jwks-rsa` consumindo `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Permite rotação sem invalidar sessões e elimina segredo HMAC compartilhado.
+
+### Robustez do pipeline IA
+- [ ] **Idempotência por `messageId`** — pré-requisito para reativar `attempts > 1` na fila WhatsApp sem risco de resposta duplicada ao lead. Hoje `attempts: 1` por segurança.
+- [ ] **Avaliar `gpt-4o-mini-transcribe`** vs `whisper-1` para PT-BR — benchmark com áudios reais de leads.
+- [ ] **Prompt caching no Anthropic SDK** — só compensa quando o system prompt passar de 1024 tokens (cache mínimo Sonnet). Quando enriquecermos com glossário de bairros / scripts de objeção, ativar `cache_control: ephemeral`.
+- [ ] **Cap defensivo em `history`** dentro do `ai-engine.generateResponse` (ex.: últimas 30 trocas) — defesa em profundidade.
+
+### Performance
+- [ ] **`getConversationHistory` em uma única RPC** — hoje faz 2 round-trips ao Supabase por mensagem entrando.
 
 ### Entregável da Fase 2
 - Painel funcional acessível pelo cliente
