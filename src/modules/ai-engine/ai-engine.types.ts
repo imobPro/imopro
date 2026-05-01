@@ -20,11 +20,16 @@ export type IntentType =
   | 'visita'
   | 'desconhecido'
 
+export type TransferReason =
+  | 'pedido_explicito'
+  | 'intencao_fechamento'
+  | 'ia_sem_resposta'
+
 export interface AIResponse {
   text: string
   intent: IntentType
   shouldTransfer: boolean
-  transferReason?: string
+  transferReason?: TransferReason
 }
 
 export interface PendingMessage {

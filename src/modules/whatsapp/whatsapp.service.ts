@@ -25,7 +25,7 @@ export async function enqueueMessage(
 ): Promise<void> {
   const type = detectMessageType(payload)
   const pendingKey = `pending:${tenantId}:${payload.phone}`
-  const debounceJobId = `debounce:${tenantId}:${payload.phone}`
+  const debounceId = `debounce:${tenantId}:${payload.phone}`
 
   const pending: PendingMessage = {
     text: payload.text?.message ?? payload.image?.caption ?? null,
@@ -39,9 +39,8 @@ export async function enqueueMessage(
   await redisConnection.rpush(pendingKey, JSON.stringify(pending))
   await redisConnection.expire(pendingKey, PENDING_TTL_SECONDS)
 
-  // Job de trigger — BullMQ deduplica por jobId: só o primeiro é aceito
   const triggerJob: WhatsAppMessageJob = {
-    jobId: debounceJobId,
+    jobId: debounceId,
     tenantId,
     instanceId: payload.instanceId,
     phone: payload.phone,
@@ -54,8 +53,16 @@ export async function enqueueMessage(
     isFromMe: payload.fromMe,
   }
 
-  await whatsappQueue.add(debounceJobId, triggerJob, {
-    jobId: debounceJobId,
+  // Modo "debounce" oficial do BullMQ: cada novo burst no TTL substitui o job pendente
+  // e estende o TTL. Após o job sair da fila (concluído/falhado), o id volta a estar livre,
+  // sem o problema de colisão com jobs em removeOnComplete.
+  await whatsappQueue.add('debounce', triggerJob, {
+    deduplication: {
+      id: debounceId,
+      ttl: DEBOUNCE_DELAY_MS,
+      extend: true,
+      replace: true,
+    },
     delay: DEBOUNCE_DELAY_MS,
   })
 }

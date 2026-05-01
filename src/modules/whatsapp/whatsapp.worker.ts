@@ -50,10 +50,16 @@ async function scheduleHandoffCheck(
   await redisConnection.set(flagKey, '1', 'EX', HANDOFF_FLAG_TTL_SECONDS)
 
   const checkJobId = `handoff-check:${job.tenantId}:${job.phone}`
+  // Handoff-check é idempotente (apenas lê a flag): pode usar deduplication para evitar
+  // dupla agendagem sem o risco de colisão com jobs completados em retenção.
   await queue.add(
-    checkJobId,
+    'handoff-check',
     { ...job, jobId: checkJobId },
-    { jobId: checkJobId, delay: HANDOFF_CHECK_DELAY_MS }
+    {
+      deduplication: { id: checkJobId, ttl: HANDOFF_CHECK_DELAY_MS },
+      delay: HANDOFF_CHECK_DELAY_MS,
+      attempts: 3,
+    }
   )
 
   console.log(`[Worker] Handoff agendado | tenant=${job.tenantId} phone=${job.phone} check=15min`)
@@ -295,6 +301,9 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
     {
       connection: redisConnection,
       concurrency: 5,
+      // Pipeline (Whisper + Sonnet + Haiku + Supabase + Z-API) pode passar dos 30s default.
+      // Sem isso, jobs longos viram stalled e geram resposta duplicada ao lead.
+      lockDuration: 120_000,
     }
   )
 

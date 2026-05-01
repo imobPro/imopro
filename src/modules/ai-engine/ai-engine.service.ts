@@ -1,16 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk'
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import { buildSystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
   AIResponse,
   IntentType,
   PendingMessage,
+  TransferReason,
 } from './ai-engine.types'
 
 const MODEL = process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-sonnet-4-6'
 const AUDIO_FALLBACK_MESSAGE =
   'Não consegui entender bem sua mensagem. Pode me enviar novamente ou escrever o que precisa?'
+
+const VALID_TRANSFER_REASONS: readonly TransferReason[] = [
+  'pedido_explicito',
+  'intencao_fechamento',
+  'ia_sem_resposta',
+]
 
 // Clientes inicializados na primeira chamada — servidor sobe sem as chaves configuradas
 let anthropicClient: Anthropic | null = null
@@ -19,7 +26,11 @@ let openaiClient: OpenAI | null = null
 function getAnthropic(): Anthropic {
   if (!anthropicClient) {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY não definida')
-    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    anthropicClient = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      maxRetries: 2,
+      timeout: 30_000,
+    })
   }
   return anthropicClient
 }
@@ -27,7 +38,11 @@ function getAnthropic(): Anthropic {
 function getOpenAI(): OpenAI {
   if (!openaiClient) {
     if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY não definida')
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      maxRetries: 2,
+      timeout: 30_000,
+    })
   }
   return openaiClient
 }
@@ -45,9 +60,11 @@ export async function transcribeAudio(
       return null
     }
 
-    const buffer = await response.arrayBuffer()
-    const filename = `audio.${mimeType.split('/')[1] ?? 'ogg'}`
-    const file = new File([buffer], filename, { type: mimeType })
+    // Z-API costuma enviar PTT do WhatsApp como `audio/ogg; codecs=opus` — extrair só o tipo base
+    const baseMime = mimeType.split(';')[0].trim() || 'audio/ogg'
+    const ext = baseMime.split('/')[1] || 'ogg'
+    const buffer = Buffer.from(await response.arrayBuffer())
+    const file = await toFile(buffer, `audio.${ext}`, { type: baseMime })
 
     const result = await openai.audio.transcriptions.create({
       file,
@@ -75,14 +92,19 @@ export function detectIntent(text: string): IntentType {
   return 'desconhecido'
 }
 
-function parseTransfer(text: string): { cleanText: string; shouldTransfer: boolean; transferReason?: string } {
+function parseTransfer(text: string): { cleanText: string; shouldTransfer: boolean; transferReason?: TransferReason } {
   const match = /\[TRANSFER:([^\]]+)\]/.exec(text)
   if (!match) return { cleanText: text.trim(), shouldTransfer: false }
-  return {
-    cleanText: text.replace(match[0], '').trim(),
-    shouldTransfer: true,
-    transferReason: match[1],
+
+  const cleanText = text.replace(match[0], '').trim()
+  const reason = match[1].trim() as TransferReason
+
+  // Se a IA alucinar uma razão fora do whitelist, ignorar o handoff e devolver só o texto
+  if (!VALID_TRANSFER_REASONS.includes(reason)) {
+    return { cleanText, shouldTransfer: false }
   }
+
+  return { cleanText, shouldTransfer: true, transferReason: reason }
 }
 
 export async function generateResponse(
@@ -128,7 +150,7 @@ export async function generateResponse(
     })
 
     const block = result.content[0]
-    rawText = block.type === 'text' ? block.text : ''
+    rawText = block?.type === 'text' ? block.text : ''
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[AI] Falha ao gerar resposta | tenant=${tenantId} phone=${phone} erro=${msg}`)
