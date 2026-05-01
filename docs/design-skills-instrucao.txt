@@ -1,0 +1,66 @@
+# Instrução — Implementar Design Skills no Claude Code
+
+Use este arquivo quando o painel (Sprint 6) estiver funcionalmente completo
+e você quiser polir o visual antes de mostrar para o primeiro cliente.
+
+---
+
+## Passo 1 — Buscar as skills
+
+Cole esse prompt no Claude Code:
+
+"Preciso adicionar 3 design skills na pasta /skills do projeto ImobPro.
+Busca no GitHub e adiciona os seguintes arquivos:
+
+1. Emil Kowalski animation skill — ensina animações e transições com easing correto
+2. Impeccable design skill — vocabulário completo de design com o comando /polish
+3. Taste skill — ensina bom gosto de design, evita output genérico de IA
+
+Salva cada uma em /skills/design/ com nomes descritivos.
+Depois confirma que foram adicionadas corretamente."
+
+---
+
+## Passo 2 — Aplicar no painel
+
+Depois que as skills estiverem na pasta, cole esse prompt:
+
+"Leia as 3 design skills em /skills/design/ e aplique no frontend do ImobPro.
+Comece pelo /polish em todas as telas existentes.
+Regras que já temos no projeto:
+- Zero emojis
+- Tom profissional
+- Sem gradientes genéricos
+- Sem cara de output de IA
+
+Mostre o antes e depois de cada tela alterada."
+
+---
+
+## Passo 3 — Revisão final
+
+Antes de mostrar para o primeiro cliente, rode:
+
+"Faz uma revisão completa do frontend com foco em:
+- Tipografia consistente
+- Espaçamento uniforme
+- Cores coerentes
+- Animações suaves nas transições
+- Layout responsivo mobile-first
+
+Aplica os ajustes necessários."
+
+---
+
+## Quando usar
+
+✅ Sprint 6 funcionalmente completo
+✅ Login funcionando
+✅ Pelo menos uma tela com dados reais
+✅ Antes de mostrar para o primeiro cliente piloto
+
+## Quando NÃO usar
+
+❌ No meio de um sprint em andamento
+❌ Antes de ter dados reais no painel
+❌ Antes de validar que todas as rotas funcionam
