@@ -104,6 +104,10 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - [ ] `getBusinessHoursMessage` por tenant (hoje ignora `tenantId` com `void`)
 - [ ] Token Z-API por tenant — hoje compartilhado via `process.env.ZAPI_TOKEN`, quebra com 2º cliente
 
+### Sprint 8.5 — Polimento pré-cliente
+- [ ] Aplicar design skills no painel antes da primeira demo (Emil Kowalski animation, Impeccable `/polish`, Taste skill) — referência: `docs/design-skills-instrucao.txt`
+- [ ] Handoff conversacional preparatório: nos 15 min entre transferência e o corretor assumir, IA mantém tom "preparando entrada do corretor" em vez de silêncio. Se o tempo estourar, mensagem de retomada reconhece a espera sem depreciar o corretor
+
 ---
 
 ## Backlog técnico — pós-revisão de 2026-04-26
@@ -151,8 +155,13 @@ Itens identificados na revisão dos módulos críticos com Context7. Não bloque
 **Status:** 🔲 Não iniciado
 
 - [ ] Planos Basic / Pro / Enterprise com limites e permissões
+- [ ] **Áudio como feature paga** — transcrição Whisper desligada no Basic, ligada no Pro/Enterprise. Plug-and-play (já existe na infra), só falta gating por plano
 - [ ] Integração com Vivareal (importar portfólio de imóveis)
 - [ ] Integração com OLX Imóveis
+- [ ] **Integração Google Calendar** — agente verifica agenda do corretor e propõe horários disponíveis ao lead direto na conversa. Diferencial competitivo (nenhum concorrente faz hoje)
+- [ ] **Integração Gmail** — entrega dos relatórios mensais via Gmail MCP em vez do mailer próprio do Sprint 7
+- [ ] **Integração Google Drive** — relatórios PDF arquivados em pasta dedicada por imobiliária, geradas automaticamente no provisionamento
+- [ ] **Migração para Managed Agents da Anthropic** — quando sair de Research Preview. Substitui o loop manual atual, ganha memória persistente por lead e habilita multi-agente (qualificação + relatório em paralelo). Referência: `docs/managed-agents-instrucao.txt`
 - [ ] API pública para clientes Enterprise
 - [ ] Suporte tier (chat no painel para clientes Pro/Enterprise)
 - [ ] Dashboard de métricas agregadas (visão do admin)
