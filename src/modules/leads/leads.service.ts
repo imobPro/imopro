@@ -290,40 +290,27 @@ export async function getConversationStats(
 // -----------------------------------------------------------------------------
 // Histórico das últimas N mensagens da conversa — alimenta o contexto da IA
 // -----------------------------------------------------------------------------
+// Migration 010 unificou em 1 round-trip via RPC get_conversation_history.
+// A RPC retorna ordem DESC; aqui invertemos para ASC (esperado pela IA).
 
 export async function getConversationHistory(
   tenantId: string,
   leadId: string,
   limit = 20
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
-  const { data: conv, error: convError } = await supabase
-    .from('conversations')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('lead_id', leadId)
-    .maybeSingle()
+  const { data, error } = await supabase.rpc('get_conversation_history', {
+    p_tenant_id: tenantId,
+    p_lead_id: leadId,
+    p_limit: limit,
+  })
 
-  if (convError) {
-    console.error(`[Leads] getConversationHistory: lookup conversation falhou | leadId=${leadId} erro=${convError.message}`)
+  if (error) {
+    console.error(`[Leads] getConversationHistory RPC falhou | leadId=${leadId} erro=${error.message}`)
     return []
   }
-  if (!conv) return []
+  if (!data || data.length === 0) return []
 
-  const { data: messages, error: msgError } = await supabase
-    .from('messages')
-    .select('role, content')
-    .eq('conversation_id', (conv as { id: string }).id)
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
-  if (msgError) {
-    console.error(`[Leads] getConversationHistory: lookup messages falhou | leadId=${leadId} erro=${msgError.message}`)
-    return []
-  }
-  if (!messages || messages.length === 0) return []
-
-  return (messages as Array<{ role: string; content: string }>)
+  return (data as Array<{ role: string; content: string }>)
     .reverse()
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 }
