@@ -1,5 +1,6 @@
 import { supabase } from '../../shared/database/supabase'
 import type {
+  IncomingMessage,
   Lead,
   LeadStatus,
   UpsertLeadParams,
@@ -204,6 +205,58 @@ export async function saveConversationMessages(
   await supabase.rpc('increment_conversation_count', {
     p_conversation_id: conversationId,
     p_count: incomingMessages.length + 1,
+  })
+}
+
+// -----------------------------------------------------------------------------
+// Persiste apenas as mensagens do lead — usado quando o agente está desligado
+// (agent_active=false): não há resposta da IA, mas a mensagem precisa ficar
+// disponível no painel para o corretor responder manualmente.
+// -----------------------------------------------------------------------------
+
+export async function saveIncomingMessagesOnly(params: {
+  tenantId: string
+  leadId: string
+  incomingMessages: IncomingMessage[]
+}): Promise<void> {
+  const { tenantId, leadId, incomingMessages } = params
+  if (incomingMessages.length === 0) return
+  const now = new Date().toISOString()
+
+  const { data: conv, error: convError } = await supabase
+    .from('conversations')
+    .upsert(
+      { tenant_id: tenantId, lead_id: leadId, last_message_at: now },
+      { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
+    )
+    .select('id')
+    .single()
+
+  if (convError) throw new Error(`[Leads] saveIncomingMessagesOnly upsert conversation falhou: ${convError.message}`)
+
+  const conversationId: string = conv.id
+
+  const messagesToInsert = incomingMessages.map((m) => ({
+    tenant_id: tenantId,
+    conversation_id: conversationId,
+    lead_id: leadId,
+    role: 'user' as const,
+    content: m.content,
+    type: m.type,
+    media_url: m.mediaUrl,
+    zapi_message_id: m.zapiMessageId,
+    created_at: now,
+  }))
+
+  const { error: msgError } = await supabase
+    .from('messages')
+    .upsert(messagesToInsert, { onConflict: 'zapi_message_id', ignoreDuplicates: true })
+
+  if (msgError) throw new Error(`[Leads] saveIncomingMessagesOnly insert messages falhou: ${msgError.message}`)
+
+  await supabase.rpc('increment_conversation_count', {
+    p_conversation_id: conversationId,
+    p_count: incomingMessages.length,
   })
 }
 

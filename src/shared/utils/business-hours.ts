@@ -20,6 +20,27 @@ const DEFAULT_SCHEDULE: BusinessHoursConfig = {
   },
 }
 
+/**
+ * Constrói um BusinessHoursConfig a partir das configurações do tenant.
+ * Decisão Sprint 8: hora abertura/fechamento vale segunda a sexta; sábado e
+ * domingo ficam fechados. Quando o produto precisar de horário por dia, a
+ * tabela tenant ganha colunas adicionais ou uma tabela `tenant_schedule`.
+ */
+export function buildScheduleFromTenant(start: number, end: number): BusinessHoursConfig {
+  const range = { start, end }
+  return {
+    schedule: {
+      0: null,         // domingo
+      1: range,        // segunda
+      2: range,        // terça
+      3: range,        // quarta
+      4: range,        // quinta
+      5: range,        // sexta
+      6: null,         // sábado
+    },
+  }
+}
+
 function getNowInSaoPaulo(): { dayOfWeek: number; hour: number; minutes: number } {
   const now = new Date()
   const formatted = new Intl.DateTimeFormat('pt-BR', {

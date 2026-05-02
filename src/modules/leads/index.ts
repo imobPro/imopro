@@ -3,6 +3,7 @@ export {
   updateLeadStatus,
   scoreUp,
   saveConversationMessages,
+  saveIncomingMessagesOnly,
   flagInactiveLeads,
   calcScoreDelta,
   getConversationStats,

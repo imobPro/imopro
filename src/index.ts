@@ -13,6 +13,7 @@ import {
   registerReportsSchedules,
   startReportsWorker,
 } from './modules/reports'
+import { tenantSettingsRouter } from './modules/tenant-settings'
 import { requireAuth } from './shared/middleware/auth'
 import { errorHandler } from './shared/errors/error-handler'
 
@@ -39,6 +40,7 @@ app.use('/webhook', webhookLimiter, whatsappRouter)
 
 app.use('/api', apiLimiter, requireAuth, authRouter)
 app.use('/api/reports', apiLimiter, requireAuth, reportsRouter)
+app.use('/api/settings', apiLimiter, requireAuth, tenantSettingsRouter)
 
 app.use(errorHandler)
 

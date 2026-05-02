@@ -2,6 +2,7 @@ export interface AgentConfig {
   tenantId: string
   agentName: string       // ex: "Ana" ou "Assistente Virtual"
   realtyName: string      // nome da imobiliária
+  welcomeMessage?: string | null // tom/identidade da marca — entra no system prompt
   specialties?: string[]  // ex: ["zona norte", "imóveis comerciais"]
   agentPhone?: string     // número do corretor para handoff
 }

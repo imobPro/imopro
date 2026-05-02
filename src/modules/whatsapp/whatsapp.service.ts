@@ -1,6 +1,6 @@
 import { whatsappQueue } from '../../shared/queue/queues'
 import { redisConnection } from '../../shared/queue/redis'
-import { getNextBusinessDay } from '../../shared/utils/business-hours'
+import { getNextBusinessDay, type BusinessHoursConfig } from '../../shared/utils/business-hours'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
 import type { PendingMessage } from '../ai-engine/ai-engine.types'
 import type {
@@ -228,10 +228,14 @@ export function buildCorretorAlert(leadPhone: string, tenantId: string): string 
 // Mensagem de retorno fora do horário comercial
 // ---------------------------------------------------------------------------
 
-export function getBusinessHoursMessage(tenantId: string): string {
-  // tenantId será usado na Sprint 5 para buscar config personalizada do tenant
-  void tenantId
-  const nextDay = getNextBusinessDay()
+export function getBusinessHoursMessage(
+  customMessage: string | null,
+  schedule?: BusinessHoursConfig
+): string {
+  const trimmed = customMessage?.trim()
+  if (trimmed && trimmed.length > 0) return trimmed
+
+  const nextDay = getNextBusinessDay(schedule)
   return (
     `Olá! Recebemos sua mensagem.\n\n` +
     `No momento estamos fora do horário de atendimento, mas nossa equipe retornará seu contato na ${nextDay}.\n\n` +

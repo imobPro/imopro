@@ -1,7 +1,7 @@
 import { Worker, Queue } from 'bullmq'
 import { redisConnection } from '../../shared/queue/redis'
 import { WHATSAPP_QUEUE_NAME } from '../../shared/queue/queues'
-import { isWithinBusinessHours } from '../../shared/utils/business-hours'
+import { buildScheduleFromTenant, isWithinBusinessHours } from '../../shared/utils/business-hours'
 import {
   detectLeadProfile,
   shouldTransferToHuman,
@@ -17,6 +17,7 @@ import {
   updateLeadStatus,
   scoreUp,
   saveConversationMessages,
+  saveIncomingMessagesOnly,
   calcScoreDelta,
   getConversationStats,
   getConversationHistory,
@@ -25,6 +26,7 @@ import {
 } from '../leads'
 import { analyzeSentiment } from '../sentiment'
 import { getHandoffTargetPhone } from '../agents'
+import { getTenantSettings, type TenantSettings } from '../tenant-settings'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
@@ -34,11 +36,12 @@ import type { SentimentType } from '../sentiment'
 const HANDOFF_CHECK_DELAY_MS = 15 * 60 * 1000
 const HANDOFF_FLAG_TTL_SECONDS = 1800
 
-function getAgentConfig(tenantId: string): AgentConfig {
+function buildAgentConfig(settings: TenantSettings): AgentConfig {
   return {
-    tenantId,
-    agentName: process.env.AGENT_NAME ?? 'Assistente',
-    realtyName: process.env.REALTY_NAME ?? 'Imobiliária',
+    tenantId: settings.tenantId,
+    agentName: settings.agentName,
+    realtyName: settings.realtyName,
+    welcomeMessage: settings.welcomeMessage,
   }
 }
 
@@ -127,15 +130,45 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
         return
       }
 
-      // 2. Verificar horário comercial
-      const withinHours = isWithinBusinessHours()
+      // 2. Carregar configurações do tenant (Sprint 8). Falha → defaults seguros
+      // dentro de getTenantSettings; o atendimento não deve cair por config.
+      const settings = await getTenantSettings(tenantId)
+      const schedule = buildScheduleFromTenant(settings.businessHoursStart, settings.businessHoursEnd)
+      const withinHours = isWithinBusinessHours(schedule)
       const instanceToken = process.env.ZAPI_TOKEN
       const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
+
+      // 2a. Toggle do agente desligado: salva mensagem do lead, não responde
+      if (!settings.agentActive) {
+        console.log(`[Worker] Agente desligado | tenant=${tenantId} phone=${phone} — IA em silêncio`)
+        let lead
+        try {
+          const detected = [...pendingMessages].reverse().find((m) => m.text)?.text ?? null
+          lead = await upsertLead({ tenantId, phone, profile: detected ? detectLeadProfile(detected) : null })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.error(`[Worker] agentActive=false: upsertLead falhou | ${msg}`)
+          return
+        }
+        const incoming: IncomingMessage[] = pendingMessages
+          .filter((m) => m.text || m.mediaUrl)
+          .map((m) => ({
+            zapiMessageId: `${data.messageId}-${m.timestamp}`,
+            content: m.text ?? '',
+            type: m.type,
+            mediaUrl: m.mediaUrl,
+          }))
+        await saveIncomingMessagesOnly({ tenantId, leadId: lead.id, incomingMessages: incoming }).catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.error(`[Worker] agentActive=false: saveIncomingMessagesOnly falhou | ${msg}`)
+        })
+        return
+      }
 
       if (!withinHours) {
         if (zapi) {
           try {
-            await zapi.sendText({ phone, message: getBusinessHoursMessage(tenantId) })
+            await zapi.sendText({ phone, message: getBusinessHoursMessage(settings.outOfHoursMessage, schedule) })
             console.log(`[Worker] Mensagem de fora de horário enviada | phone=${phone}`)
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
@@ -221,7 +254,7 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       }
 
       // 7. Gerar resposta via IA
-      const config = getAgentConfig(tenantId)
+      const config = buildAgentConfig(settings)
 
       let aiResponse
       try {

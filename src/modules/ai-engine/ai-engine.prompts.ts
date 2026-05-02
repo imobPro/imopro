@@ -5,8 +5,12 @@ export function buildSystemPrompt(config: AgentConfig): string {
     ? `Especialidades: ${config.specialties.join(', ')}.`
     : ''
 
+  const welcomeLine = config.welcomeMessage?.trim()
+    ? `\n\nTom e identidade da imobiliária (use como referência, não cite literalmente): ${config.welcomeMessage.trim()}`
+    : ''
+
   return `Você é ${config.agentName}, assistente de atendimento da ${config.realtyName}.
-${specialtiesLine}
+${specialtiesLine}${welcomeLine}
 
 ## Seu papel
 
