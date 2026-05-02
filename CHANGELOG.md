@@ -36,6 +36,46 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-02] — Backlog técnico de hardening
+
+**Fase:** Fase 2 — Painel web + relatórios (entre Sprint 8 e 8.5)
+**Duração:** ~1h30
+
+### O que foi feito
+- **Idempotência por messageId** — `markMessageSeen(tenantId, messageId)` com Redis SET NX EX 24h descarta reentregas do webhook Z-API antes de enfileirar. Falha do Redis não bloqueia o atendimento (segue para enqueue, UNIQUE em zapi_message_id pega na persistência). Comentário em `queues.ts` atualizado explicando defesa em camadas.
+- **RPC unificada `get_conversation_history`** — substitui 2 round-trips ao Supabase (lookup conversation + fetch messages) por 1 chamada de RPC. JOIN interno com filtros de tenant_id em ambas as tabelas. SECURITY INVOKER + STABLE + search_path fixo. Migration 010.
+- **Auth HS256 → JWKS** — `requireAuth` agora usa `jose.createRemoteJWKSet` apontando para `/auth/v1/.well-known/jwks.json` do Supabase. Verifica ES256/RS256, audience=`authenticated`, issuer=`${SUPABASE_URL}/auth/v1`. `jsonwebtoken` removido, `jose` 6.2.3 instalada. `SUPABASE_JWT_SECRET` sai dos envs obrigatórios.
+
+### Arquivos criados ou modificados
+- `src/modules/whatsapp/whatsapp.service.ts` — adiciona `markMessageSeen`
+- `src/modules/whatsapp/whatsapp.controller.ts` — usa `markMessageSeen` antes do `enqueueMessage`
+- `src/shared/queue/queues.ts` — comentário sobre attempts=1 e dedup pré-fila
+- `src/tests/whatsapp.service.test.ts` — 3 testes de `markMessageSeen`
+- `migrations/010_history_rpc.sql` — RPC `get_conversation_history`
+- `src/modules/leads/leads.service.ts` — `getConversationHistory` chama RPC
+- `src/tests/leads.service.test.ts` — 5 testes de `getConversationHistory` com mock de `supabase.rpc`
+- `src/shared/middleware/auth.ts` — reescrito com `jose` + JWKS lazy
+- `src/shared/utils/validate-env.ts` — `SUPABASE_JWT_SECRET` removido da lista
+- `src/tests/auth.middleware.test.ts` — chaves ES256 locais, mock de `createRemoteJWKSet`, +1 teste (issuer errado)
+- `package.json` / `package-lock.json` — `jose`+, `jsonwebtoken`/`@types/jsonwebtoken`-
+
+### Decisões tomadas
+- **Dedup pré-fila + UNIQUE no DB** em vez de retry-safe job: reativar `attempts > 1` exige flag "delivered" por job, ficou para outro ciclo. As duas camadas atuais cobrem o caso real (Z-API reentregando webhook).
+- **RPC SECURITY INVOKER** (default) com filtro explícito de tenant_id na query: backend continua usando service-role e bypassa RLS, mas o filtro garante isolamento mesmo nesse cenário. Quando frontend chamar a RPC direto, RLS volta a valer.
+- **Forçar relogin na migração JWKS** em vez de manter HS256 como fallback: como ainda estamos pré-cliente, o custo é só Arthur fazer logout/login. Fallback duplo aumentava complexidade sem ganho.
+
+### Pendências para próxima sessão
+- [ ] **Pré-deploy**: rodar migration 010 no SQL Editor do Supabase
+- [ ] **Pré-deploy**: habilitar asymmetric signing keys no painel Supabase (Project Settings → JWT Signing Keys → Migrate to ECC). Sem isso, o endpoint JWKS retorna `{}` e o login quebra.
+- [ ] **Pós-deploy**: logout + relogin no painel `/login` para reemitir JWT no novo formato
+- [ ] **Backlog ainda em aberto**: cap defensivo em `history` no ai-engine, prompt caching no Anthropic SDK quando o system prompt passar de 1024 tokens, avaliar `gpt-4o-mini-transcribe` vs Whisper para PT-BR
+
+### Estado dos testes
+- 106 totais passando (antes: 97). +9 testes (3 idempotência + 5 RPC histórico + 1 issuer auth)
+- 2 erros TS pré-existentes em `tenant-settings.service.test.ts` (Sprint 8) ainda presentes — não introduzidos por este ciclo
+
+---
+
 ## [2026-05-02] — Sprint 8: Configurações do agente
 
 **Fase:** Fase 2 — Painel web

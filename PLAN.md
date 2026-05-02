@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 2 — Painel web (última sprint concluída: 8)
-**Próximo passo:** Sprint 8.5 — Polimento pré-cliente, ou atacar backlog técnico (JWKS, idempotência por messageId, RPC do histórico)
+**Fase:** 2 — Painel web (última sprint concluída: 8 + hardening de 2026-05-02)
+**Próximo passo:** Sprint 8.5 — Polimento pré-cliente
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -119,16 +119,17 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 Itens identificados na revisão dos módulos críticos com Context7. Não bloqueiam Sprint 7, mas devem entrar no roadmap de hardening.
 
 ### Segurança / Auth
-- [ ] **JWT HS256 → JWKS (RS256/ECC)** — recomendação oficial Supabase para projetos novos. Migrar `auth.ts` de `jsonwebtoken` HS256 para `jose` + `jwks-rsa` consumindo `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Permite rotação sem invalidar sessões e elimina segredo HMAC compartilhado.
+- ✅ 2026-05-02 **JWT HS256 → JWKS** — `requireAuth` migrado para `jose` + `createRemoteJWKSet` apontando para `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`. Verifica ES256/RS256, audience+issuer. Pré-requisito operacional: habilitar asymmetric signing keys no painel Supabase antes do deploy.
 
 ### Robustez do pipeline IA
-- [ ] **Idempotência por `messageId`** — pré-requisito para reativar `attempts > 1` na fila WhatsApp sem risco de resposta duplicada ao lead. Hoje `attempts: 1` por segurança.
+- ✅ 2026-05-02 **Idempotência por `messageId`** — `markMessageSeen` com Redis SET NX EX 24h descarta reentregas no controller. Defesa em camadas com UNIQUE no DB. `attempts: 1` mantido até flag "delivered" por job ser implementada.
+- [ ] **Reativar `attempts > 1`** — exige flag "delivered" por job antes de cada `zapi.sendText` (Redis ou DB) para que retentativas após stalled detection não enviem resposta em duplicata.
 - [ ] **Avaliar `gpt-4o-mini-transcribe`** vs `whisper-1` para PT-BR — benchmark com áudios reais de leads.
 - [ ] **Prompt caching no Anthropic SDK** — só compensa quando o system prompt passar de 1024 tokens (cache mínimo Sonnet). Quando enriquecermos com glossário de bairros / scripts de objeção, ativar `cache_control: ephemeral`.
 - [ ] **Cap defensivo em `history`** dentro do `ai-engine.generateResponse` (ex.: últimas 30 trocas) — defesa em profundidade.
 
 ### Performance
-- [ ] **`getConversationHistory` em uma única RPC** — hoje faz 2 round-trips ao Supabase por mensagem entrando.
+- ✅ 2026-05-02 **`getConversationHistory` em uma única RPC** — migration 010 cria `get_conversation_history(tenant_id, lead_id, limit)`. Service consome via `supabase.rpc()`.
 
 ### Entregável da Fase 2
 - Painel funcional acessível pelo cliente
