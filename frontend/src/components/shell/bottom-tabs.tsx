@@ -10,7 +10,7 @@ export function BottomTabs() {
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background border-t">
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active =

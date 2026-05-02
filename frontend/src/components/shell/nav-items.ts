@@ -3,6 +3,7 @@ import {
   Users,
   TrendingUp,
   BarChart3,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,4 +18,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/leads", label: "Leads", icon: Users },
   { href: "/funil", label: "Funil", icon: TrendingUp },
   { href: "/metricas", label: "Métricas", icon: BarChart3 },
+  { href: "/relatorios", label: "Relatórios", icon: FileText },
 ];
