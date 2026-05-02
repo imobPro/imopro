@@ -14,3 +14,28 @@ export const whatsappQueue = new Queue<WhatsAppMessageJob>(WHATSAPP_QUEUE_NAME, 
     removeOnFail: 500,     // mantém os últimos 500 jobs com falha para diagnóstico
   },
 })
+
+// -----------------------------------------------------------------------------
+// Fila de relatórios automáticos (Sprint 7)
+// -----------------------------------------------------------------------------
+
+export const REPORTS_QUEUE_NAME = 'reports'
+
+export type ReportsJobName = 'monthly' | 'weekly' | 'inactive-flag'
+
+export interface ReportsJobData {
+  triggeredAt: string // ISO timestamp pra logs/idempotência
+}
+
+// NameType deixado como string default: o id do scheduler ('schedule-monthly')
+// não bate com ReportsJobName ('monthly'). O Worker faz cast no switch.
+export const reportsQueue = new Queue<ReportsJobData>(REPORTS_QUEUE_NAME, {
+  connection: redisConnection,
+  defaultJobOptions: {
+    // Cada handler é idempotente (upsert por unique key + skip se sent_at), então retry é seguro
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60_000 }, // 1min → 2min → 4min
+    removeOnComplete: 50,
+    removeOnFail: 200,
+  },
+})

@@ -1,5 +1,5 @@
 import { supabase } from '../../shared/database/supabase'
-import type { AuthAgent, HandoffTarget } from './agents.types'
+import type { AgentForReports, AuthAgent, HandoffTarget } from './agents.types'
 
 /**
  * Busca o agent ativo vinculado a um usuário autenticado.
@@ -86,4 +86,58 @@ export async function getHandoffTargetPhone(
   }
 
   return null
+}
+
+/**
+ * Lista todos os agents ativos com e-mail conhecido em auth.users — usado pelo
+ * cron de relatórios automáticos. Roda com service-role (bypassa RLS).
+ *
+ * Implementado em duas queries porque PostgREST não consegue fazer join direto
+ * em auth.users a partir de public.agents sem foreign key declarada.
+ */
+export async function listAgentsForReports(): Promise<AgentForReports[]> {
+  const { data: agents, error: agentsError } = await supabase
+    .from('agents')
+    .select('id, name, user_id, tenant_id, tenants(name)')
+    .eq('active', true)
+    .not('user_id', 'is', null)
+
+  if (agentsError) {
+    console.error(`[Agents] listAgentsForReports falhou: ${agentsError.message}`)
+    return []
+  }
+
+  const rows = (agents ?? []) as unknown as Array<{
+    id: string
+    name: string
+    user_id: string
+    tenant_id: string
+    tenants: { name: string } | { name: string }[] | null
+  }>
+
+  if (rows.length === 0) return []
+
+  const emails = await Promise.all(
+    rows.map(async (row) => {
+      const { data, error } = await supabase.auth.admin.getUserById(row.user_id)
+      if (error || !data.user?.email) return null
+      return { userId: row.user_id, email: data.user.email }
+    })
+  )
+
+  const emailMap = new Map<string, string>()
+  for (const e of emails) if (e) emailMap.set(e.userId, e.email)
+
+  return rows
+    .filter((row) => emailMap.has(row.user_id))
+    .map((row) => {
+      const tenant = Array.isArray(row.tenants) ? row.tenants[0] : row.tenants
+      return {
+        agentId: row.id,
+        agentName: row.name,
+        email: emailMap.get(row.user_id)!,
+        tenantId: row.tenant_id,
+        tenantName: tenant?.name ?? 'Imobiliária',
+      }
+    })
 }

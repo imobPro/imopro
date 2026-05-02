@@ -6,6 +6,8 @@ const REQUIRED_VARS: string[] = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_JWT_SECRET',
   'ZAPI_CLIENT_TOKEN',
+  'RESEND_API_KEY',
+  'RESEND_FROM_EMAIL',
 ]
 
 export function validateEnv(): void {
