@@ -9,8 +9,11 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 2 — Painel web (última sprint concluída: 6)
-**Próximo passo:** Sprint 7 — Relatórios automáticos em PDF (rodar skill `iniciar-sprint` antes)
+**Fase:** 2 — Painel web (última sprint concluída: 7)
+**Próximo passo:** Sprint 8 — Configurações do agente (rodar skill `iniciar-sprint` antes)
+
+> Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
+> — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
 
 ---
 
