@@ -11,13 +11,21 @@ export async function GET(
   const { id } = await ctx.params;
 
   const supabase = await createClient();
+
+  // getUser valida o JWT contra o servidor de auth (não confia só no cookie).
+  // Recomendação oficial do Supabase para uso server-side. getSession() puro
+  // aceitaria cookies adulterados até a expiração.
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  // Sessão validada — agora podemos pegar o access_token para repassar ao backend.
   const {
     data: { session },
-    error,
   } = await supabase.auth.getSession();
-
-  if (error || !session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  if (!session) {
+    return NextResponse.json({ error: "Sessão indisponível" }, { status: 401 });
   }
 
   const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3000";

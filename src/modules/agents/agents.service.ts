@@ -117,11 +117,19 @@ export async function listAgentsForReports(): Promise<AgentForReports[]> {
 
   if (rows.length === 0) return []
 
+  // Defensivo: cada lookup em try/catch para que uma falha isolada do auth admin
+  // não derrube o cron inteiro (Promise.all rejeita no primeiro throw).
   const emails = await Promise.all(
     rows.map(async (row) => {
-      const { data, error } = await supabase.auth.admin.getUserById(row.user_id)
-      if (error || !data.user?.email) return null
-      return { userId: row.user_id, email: data.user.email }
+      try {
+        const { data, error } = await supabase.auth.admin.getUserById(row.user_id)
+        if (error || !data.user?.email) return null
+        return { userId: row.user_id, email: data.user.email }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[Agents] getUserById ${row.user_id} lançou: ${msg}`)
+        return null
+      }
     })
   )
 
