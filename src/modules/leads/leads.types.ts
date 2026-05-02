@@ -12,6 +12,7 @@ export type LeadStatus =
   | 'transferido'
   | 'em_negociacao'
   | 'fechado'
+  | 'inativo'
 
 export interface Lead {
   id: string

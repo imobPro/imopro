@@ -59,9 +59,34 @@ export async function updateLeadStatus(
   status: LeadStatus,
   tenantId: string
 ): Promise<void> {
+  const update: Record<string, unknown> = { status }
+
+  // Marca o instante da primeira transição para 'qualificado' e 'fechado'.
+  // Necessário para os cálculos de tempo médio nos relatórios. Não sobrescrever
+  // se já estiver preenchido — primeira transição vence (caso o lead reabra
+  // e volte a 'qualificado', o timestamp original permanece).
+  if (status === 'qualificado') {
+    const { data } = await supabase
+      .from('leads')
+      .select('qualified_at')
+      .eq('id', leadId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (!data?.qualified_at) update.qualified_at = new Date().toISOString()
+  }
+  if (status === 'fechado') {
+    const { data } = await supabase
+      .from('leads')
+      .select('closed_at')
+      .eq('id', leadId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (!data?.closed_at) update.closed_at = new Date().toISOString()
+  }
+
   const { error } = await supabase
     .from('leads')
-    .update({ status })
+    .update(update)
     .eq('id', leadId)
     .eq('tenant_id', tenantId)
 
@@ -305,24 +330,46 @@ export async function persistAiFailure(
 }
 
 // -----------------------------------------------------------------------------
-// Sinaliza leads inativos (sem resposta há 30 dias) — corretor decide o status
+// Marca leads inativos (sem mensagem há REPORTS_INACTIVE_DAYS) — muda o status
+// para 'inativo' diretamente (decisão Sprint 7: sem alerta, sem reengajamento).
 // -----------------------------------------------------------------------------
 
 export async function flagInactiveLeads(tenantId: string): Promise<number> {
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const days = Number(process.env.REPORTS_INACTIVE_DAYS ?? '7') || 7
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  const now = new Date().toISOString()
 
   const { data, error } = await supabase
     .from('leads')
-    .update({ inactive_flagged_at: new Date().toISOString() })
+    .update({ status: 'inativo', inactive_flagged_at: now })
     .eq('tenant_id', tenantId)
     .lt('last_message_at', cutoff)
-    .neq('status', 'fechado')
-    .is('inactive_flagged_at', null)
+    .not('status', 'in', '("fechado","inativo")')
     .select('id')
 
   if (error) throw new Error(`[Leads] flagInactiveLeads falhou: ${error.message}`)
 
   return data?.length ?? 0
+}
+
+// Versão multi-tenant — chamada pelo cron diário
+export async function flagInactiveLeadsAllTenants(): Promise<{ tenants: number; flagged: number }> {
+  const { data: tenants, error } = await supabase.from('tenants').select('id')
+  if (error) {
+    console.error(`[Leads] flagInactiveLeadsAllTenants falhou ao listar tenants: ${error.message}`)
+    return { tenants: 0, flagged: 0 }
+  }
+
+  let flagged = 0
+  for (const t of (tenants ?? []) as Array<{ id: string }>) {
+    try {
+      flagged += await flagInactiveLeads(t.id)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[Leads] flagInactive tenant=${t.id} falhou: ${msg}`)
+    }
+  }
+  return { tenants: tenants?.length ?? 0, flagged }
 }
 
 // -----------------------------------------------------------------------------

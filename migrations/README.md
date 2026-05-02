@@ -11,6 +11,7 @@ Aplique em ordem crescente no Supabase: **Dashboard → SQL Editor → colar cad
 | 005 | `005_agents_self_policy.sql` | **Tentativa falha** — mantida no histórico, a recursão não se resolve com OR de policies permissivas. Substituída pela 006. |
 | 006 | `006_rls_helper_functions.sql` | Quebra recursão infinita da RLS via funções `SECURITY DEFINER` (`auth_tenant_ids`, `auth_agent_ids`). Reescreve todas as policies pra usar os helpers. |
 | 007 | `007_lead_view_state.sql` | `leads.last_viewed_at` — marca quando o painel abriu a conversa do lead. Per-tenant. |
+| 008 | `008_reports_and_inactive_status.sql` | Status `inativo` na enum `lead_status`, colunas `qualified_at`/`closed_at` em `leads`, tabela `reports` (mensal/semanal por agent), bucket Storage `reports` privado. Sprint 7. **Aplicada no Supabase em 2026-05-01.** |
 
 ## Criar primeiro usuário de teste (Sprint 6)
 
