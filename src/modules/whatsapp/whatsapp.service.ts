@@ -14,6 +14,22 @@ import type {
 
 const DEBOUNCE_DELAY_MS = 8000
 const PENDING_TTL_SECONDS = 300 // 5 minutos
+const SEEN_MESSAGE_TTL_SECONDS = 24 * 60 * 60 // 24h
+
+// ---------------------------------------------------------------------------
+// Idempotência por messageId — dedup pré-fila
+// ---------------------------------------------------------------------------
+// Z-API pode reentregar o mesmo webhook (network glitch, reinício, etc). Cada
+// mensagem real tem messageId único; reentrega = mesmo id. Marcamos o id no
+// Redis com NX+EX: se a chave já existir, descartamos antes de enfileirar.
+// Defesa em camadas: UNIQUE(zapi_message_id) na tabela messages é a 2ª linha,
+// mas só protege a persistência — não evita o lead receber resposta duplicada.
+
+export async function markMessageSeen(tenantId: string, messageId: string): Promise<boolean> {
+  const key = `seen_msg:${tenantId}:${messageId}`
+  const result = await redisConnection.set(key, '1', 'EX', SEEN_MESSAGE_TTL_SECONDS, 'NX')
+  return result === 'OK'
+}
 
 // ---------------------------------------------------------------------------
 // Enfileiramento de mensagens recebidas com debounce de 8s

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Request, Response } from 'express'
-import { enqueueMessage } from './whatsapp.service'
+import { enqueueMessage, markMessageSeen } from './whatsapp.service'
 
 // ---------------------------------------------------------------------------
 // Schema Zod — valida o payload Z-API em runtime
@@ -60,6 +60,21 @@ export async function receiveWebhook(req: Request, res: Response): Promise<void>
 
   // tenantId vem do instanceId da Z-API (cada tenant tem sua instância)
   const tenantId = payload.instanceId
+
+  // Idempotência: descartar reentrega do mesmo messageId (Z-API retransmite em
+  // glitches de rede). Falha do Redis aqui não pode bloquear o atendimento —
+  // segue para o enqueue, e a UNIQUE em zapi_message_id pega a duplicata na hora
+  // de persistir.
+  try {
+    const isFirstTime = await markMessageSeen(tenantId, payload.messageId)
+    if (!isFirstTime) {
+      res.status(200).json({ received: true, action: 'ignored_duplicate_message' })
+      return
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Webhook] markMessageSeen falhou — seguindo sem dedup | ${msg}`)
+  }
 
   try {
     await enqueueMessage(payload, tenantId)

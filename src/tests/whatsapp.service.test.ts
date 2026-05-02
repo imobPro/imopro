@@ -1,5 +1,11 @@
-import { describe, it, expect } from 'vitest'
-import { detectLeadProfile, shouldTransferToHuman } from '../modules/whatsapp/whatsapp.service'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('../shared/queue/redis', () => ({
+  redisConnection: { set: vi.fn() },
+}))
+
+import { detectLeadProfile, shouldTransferToHuman, markMessageSeen } from '../modules/whatsapp/whatsapp.service'
+import { redisConnection } from '../shared/queue/redis'
 import type { ConversationContext } from '../modules/whatsapp/whatsapp.types'
 
 // ---------------------------------------------------------------------------
@@ -85,5 +91,47 @@ describe('shouldTransferToHuman', () => {
   it('não transfere em conversa normal dentro do horário', () => {
     const ctx = { ...baseContext(), lastText: 'quanto custa um apartamento de 2 quartos?' }
     expect(shouldTransferToHuman(ctx)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// markMessageSeen — idempotência por messageId
+// ---------------------------------------------------------------------------
+
+describe('markMessageSeen', () => {
+  const set = redisConnection.set as ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    set.mockReset()
+  })
+
+  it('retorna true na primeira vez que o messageId é visto', async () => {
+    set.mockResolvedValueOnce('OK')
+
+    const isFirstTime = await markMessageSeen('tenant-1', 'msg-abc')
+
+    expect(isFirstTime).toBe(true)
+    expect(set).toHaveBeenCalledWith('seen_msg:tenant-1:msg-abc', '1', 'EX', 86400, 'NX')
+  })
+
+  it('retorna false quando o mesmo messageId já foi marcado', async () => {
+    set.mockResolvedValueOnce(null)
+
+    const isFirstTime = await markMessageSeen('tenant-1', 'msg-abc')
+
+    expect(isFirstTime).toBe(false)
+  })
+
+  it('isola dedup por tenant — mesmo messageId em tenants diferentes é tratado como novo', async () => {
+    set.mockResolvedValueOnce('OK')
+    set.mockResolvedValueOnce('OK')
+
+    const a = await markMessageSeen('tenant-1', 'msg-abc')
+    const b = await markMessageSeen('tenant-2', 'msg-abc')
+
+    expect(a).toBe(true)
+    expect(b).toBe(true)
+    expect(set).toHaveBeenNthCalledWith(1, 'seen_msg:tenant-1:msg-abc', '1', 'EX', 86400, 'NX')
+    expect(set).toHaveBeenNthCalledWith(2, 'seen_msg:tenant-2:msg-abc', '1', 'EX', 86400, 'NX')
   })
 })
