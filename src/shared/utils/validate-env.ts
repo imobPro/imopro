@@ -1,10 +1,12 @@
+// SUPABASE_JWT_SECRET removido: auth.ts agora usa JWKS (chaves assimétricas
+// do Supabase via /auth/v1/.well-known/jwks.json). O segredo HMAC não é mais
+// usado pelo backend.
 const REQUIRED_VARS: string[] = [
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
   'REDIS_URL',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'SUPABASE_JWT_SECRET',
   'ZAPI_CLIENT_TOKEN',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',

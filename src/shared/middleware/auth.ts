@@ -1,19 +1,31 @@
 import type { RequestHandler } from 'express'
-import jwt from 'jsonwebtoken'
+import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose'
 import { findActiveAgentByUserId, AgentLookupError } from '../../modules/agents'
 
-interface SupabaseJwtPayload {
-  sub: string
-  email?: string
-  aud: string | string[]
-  exp: number
-  iss?: string
+// -----------------------------------------------------------------------------
+// JWKS cache — Supabase Auth expõe public keys em /auth/v1/.well-known/jwks.json.
+// createRemoteJWKSet faz cache em memória com cooldown (default 30s) e refresh
+// automático quando aparece um kid novo. Lazy init: só monta o cliente quando
+// a primeira request chega, evitando crash se SUPABASE_URL ainda não está no env.
+// Pré-requisito operacional: o projeto Supabase precisa ter asymmetric signing
+// habilitado (Project Settings → JWT Signing Keys → Migrate to ECC/RSA). Sem
+// isso, o endpoint retorna {} vazio e jwtVerify lança ERR_JWKS_NO_MATCHING_KEY.
+// -----------------------------------------------------------------------------
+
+let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null
+
+function getJWKS(): ReturnType<typeof createRemoteJWKSet> {
+  if (jwksCache) return jwksCache
+  const supabaseUrl = process.env.SUPABASE_URL
+  if (!supabaseUrl) throw new Error('SUPABASE_URL não definido')
+  jwksCache = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`))
+  return jwksCache
 }
 
 export const requireAuth: RequestHandler = async (req, res, next) => {
-  const secret = process.env.SUPABASE_JWT_SECRET
-  if (!secret) {
-    console.error('[Auth] SUPABASE_JWT_SECRET não definido no ambiente')
+  const supabaseUrl = process.env.SUPABASE_URL
+  if (!supabaseUrl) {
+    console.error('[Auth] SUPABASE_URL não definido no ambiente')
     res.status(500).json({ error: { code: 'SERVER_MISCONFIGURED', message: 'Servidor mal configurado' } })
     return
   }
@@ -30,17 +42,22 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     return
   }
 
-  let payload: SupabaseJwtPayload
+  let payload: JWTPayload
   try {
-    const issuer = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1` : undefined
-    payload = jwt.verify(token, secret, {
-      algorithms: ['HS256'],
+    const result = await jwtVerify(token, getJWKS(), {
+      issuer: `${supabaseUrl}/auth/v1`,
       audience: 'authenticated',
-      issuer,
+      algorithms: ['ES256', 'RS256'],
       clockTolerance: 10,
-    }) as SupabaseJwtPayload
+    })
+    payload = result.payload
   } catch {
     res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token inválido ou expirado' } })
+    return
+  }
+
+  if (typeof payload.sub !== 'string') {
+    res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token sem subject' } })
     return
   }
 
@@ -60,9 +77,11 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     return
   }
 
+  const email = typeof payload.email === 'string' ? payload.email : null
+
   req.auth = {
     userId: payload.sub,
-    email: payload.email ?? null,
+    email,
     tenantId: agent.tenantId,
     agentId: agent.id,
   }
