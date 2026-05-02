@@ -36,6 +36,52 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-02] — Sprint 8: Configurações do agente
+
+**Fase:** Fase 2 — Painel web
+**Duração:** sessão única
+
+### O que foi feito
+- Migration 009 — colunas em `tenants` (agent_name, realty_name, welcome_message, business_hours_start/end, out_of_hours_message, agent_active) com CHECK constraints + `agents.settings_visibility jsonb` para preferência de UI por corretor
+- Módulo backend `tenant-settings` — service com defaults seguros (atende mesmo com migration 009 não aplicada), controller com 4 endpoints (`GET /api/settings`, `PATCH /api/settings/{tenant,visibility,my-phone}`), validação à mão (ranges de hora, lengths, end > start, formato E.164)
+- Worker passa a ler config do banco a cada job — `getTenantSettings(tenantId)` substitui `process.env.AGENT_NAME/REALTY_NAME`. Toggle desligado: pipeline sai antes da IA, salva mensagem do lead via `saveIncomingMessagesOnly` para o corretor responder no painel. Horário comercial usa `buildScheduleFromTenant(start, end)` (seg-sex)
+- `buildSystemPrompt` recebe `welcomeMessage` opcional e adiciona "Tom e identidade da imobiliária" como contexto (não enviado literal ao lead)
+- `getBusinessHoursMessage(custom, schedule)` retorna a mensagem custom do tenant ou cai no template padrão
+- Frontend Next.js 16 — tela `/configuracoes` com 7 switches no topo (preferência por agent) controlando a visibilidade de cada seção; 7 seções condicionais (nome agente, marca, tom, horário, msg fora horário, toggle ativo, telefone). Server actions com `revalidatePath` após cada PATCH. Componente `Switch` novo em `components/ui/switch.tsx` (base-ui)
+- 21 testes novos (76 → 97 totais passando) — `tenant-settings.service.test.ts` e `whatsapp.service.config.test.ts`
+
+### Arquivos criados ou modificados
+- `migrations/009_tenant_settings.sql` — campos do tenant + visibility por agent (NÃO APLICADA NO SUPABASE — Arthur roda)
+- `src/modules/tenant-settings/{types,service,controller,routes,index}.ts` — módulo novo
+- `src/modules/whatsapp/whatsapp.worker.ts` — pipeline integrado com config do banco e toggle desligado
+- `src/modules/whatsapp/whatsapp.service.ts` — `getBusinessHoursMessage` recebe custom + schedule
+- `src/modules/ai-engine/ai-engine.types.ts` — `welcomeMessage?` em `AgentConfig`
+- `src/modules/ai-engine/ai-engine.prompts.ts` — linha "Tom e identidade da imobiliária" condicional
+- `src/modules/leads/leads.service.ts` — nova `saveIncomingMessagesOnly` para o caso agent_active=false
+- `src/shared/utils/business-hours.ts` — `buildScheduleFromTenant(start, end)` (seg-sex)
+- `src/index.ts` — montagem de `/api/settings`
+- `src/tests/tenant-settings.service.test.ts` (15 testes), `src/tests/whatsapp.service.config.test.ts` (6 testes)
+- `frontend/src/app/(app)/configuracoes/{page,settings-form,actions}.tsx` — tela completa
+- `frontend/src/lib/queries/settings.ts` — fetch do backend com Authorization
+- `frontend/src/components/ui/switch.tsx` — wrapper base-ui
+- `frontend/src/components/shell/{nav-items,bottom-tabs}.tsx` — item "Configurações" + grid dinâmico
+
+### Decisões tomadas
+- **Token Z-API adiado para Fase 3** — entrevista decidiu cadastro via SQL no piloto. Fica fora da tela de configurações
+- **Toggle desligado salva mensagem mas IA fica em silêncio** — corretor responde manualmente no painel; modo "transferência permanente"
+- **Mensagem de boas-vindas como contexto, não literal** — entra no system prompt como tom da marca; IA mistura naturalmente
+- **Horário só por hora abertura/fechamento, seg-sex** — formato simples atende 90% dos casos. Sábado/domingo sempre fechados (decisão da entrevista)
+- **Visibilidade jsonb por agent, não por tenant** — preferência pessoal, não vaza para outros corretores. Ausência de chave = visível
+- **Defaults seguros em `getTenantSettings`** — se a coluna ainda não existir (migration 009 não aplicada), worker continua atendendo com defaults. Atendimento robusto (CLAUDE.md)
+- **Mutations via Server Actions chamando o backend Express** — reusa validação centralizada; revalidate na rota após sucesso
+
+### Pendências para próxima sessão
+- [ ] **Aplicar migration 009 no Supabase** (SQL Editor) antes de subir o backend novo em produção
+- [ ] Validação visual no browser real da `/configuracoes` (Arthur faz)
+- [ ] Sprint 8.5 (polimento pré-cliente) ou Backlog técnico (JWKS, idempotência, RPC histórico)
+
+---
+
 ## [2026-04-26] — Sprint 6 (parte 4 e 5): Métricas e Funil — Sprint 6 fechado
 
 **Fase:** Fase 2 — Painel web

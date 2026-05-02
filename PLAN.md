@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 2 — Painel web (última sprint concluída: 7)
-**Próximo passo:** Sprint 8 — Configurações do agente (rodar skill `iniciar-sprint` antes)
+**Fase:** 2 — Painel web (última sprint concluída: 8)
+**Próximo passo:** Sprint 8.5 — Polimento pré-cliente, ou atacar backlog técnico (JWKS, idempotência por messageId, RPC do histórico)
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -100,12 +100,13 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - [ ] Integrar `flagInactiveLeads` em cron diário (função existe no service, sem agendamento)
 
 ### Sprint 8 — Configurações do agente
-- [ ] Tela de configurações: nome do agente, mensagem de boas-vindas
-- [ ] Configuração de horário de atendimento (fora do horário: mensagem automática)
-- [ ] Toggle para ativar/desativar o agente
-- [ ] `getAgentConfig` no worker passa a buscar nome/imobiliária por tenant (hoje vem de `process.env`, descarta `tenantId`)
-- [ ] `getBusinessHoursMessage` por tenant (hoje ignora `tenantId` com `void`)
-- [ ] Token Z-API por tenant — hoje compartilhado via `process.env.ZAPI_TOKEN`, quebra com 2º cliente
+- ✅ 2026-05-02 Tela `/configuracoes` com nome do agente, marca, mensagem de boas-vindas (contexto IA), horário, mensagem fora do horário, toggle ativo, telefone do corretor
+- ✅ 2026-05-02 Switches no topo da tela controlam visibilidade de cada seção (preferência pessoal por agent via `agents.settings_visibility`)
+- ✅ 2026-05-02 Horário de atendimento configurável (start/end, seg-sex via `buildScheduleFromTenant`); fora do horário usa mensagem custom ou template
+- ✅ 2026-05-02 Toggle "agente ativo" — false: IA fica em silêncio, mensagem do lead é salva via `saveIncomingMessagesOnly` para o corretor responder no painel
+- ✅ 2026-05-02 `getAgentConfig` substituído por `getTenantSettings(tenantId)` no worker, com defaults seguros se a migration ainda não rodou
+- ✅ 2026-05-02 `getBusinessHoursMessage(custom, schedule)` por tenant
+- 🔁 Token Z-API por tenant — adiado para Fase 3 (entrevista decidiu cadastro via SQL no piloto)
 
 ### Sprint 8.5 — Polimento pré-cliente
 - [ ] Aplicar design skills no painel antes da primeira demo (Emil Kowalski animation, Impeccable `/polish`, Taste skill) — referência: `docs/design-skills-instrucao.txt`
@@ -141,6 +142,7 @@ Itens identificados na revisão dos módulos críticos com Context7. Não bloque
 
 - [ ] Tela de cadastro de nova imobiliária
 - [ ] Fluxo de conexão WhatsApp via QR code
+- [ ] **Token Z-API por tenant** — hoje compartilhado via `process.env.ZAPI_TOKEN`. Adiado do Sprint 8 porque entrevistas decidiram cadastro via SQL no piloto. Quando o onboarding self-service entrar, cliente cola o token na tela de provisionamento
 - [ ] Integração Stripe ou Asaas para cobrança recorrente
 - [ ] Provisionamento automático após pagamento confirmado
 - [ ] Página de planos e preços
