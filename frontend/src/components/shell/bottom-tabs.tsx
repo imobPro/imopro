@@ -10,7 +10,12 @@ export function BottomTabs() {
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background border-t">
-      <ul className="grid grid-cols-5">
+      <ul
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${NAV_ITEMS.length}, minmax(0, 1fr))`,
+        }}
+      >
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const active =
