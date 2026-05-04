@@ -159,7 +159,10 @@ export function LeadsList({
           </Button>
         </div>
         {filtersOpen && (
-          <div id="leads-filters-panel">
+          <div
+            id="leads-filters-panel"
+            className="animate-in fade-in slide-in-from-top-1 duration-base ease-out-quart"
+          >
             <FilterChips groups={groups} onClearAll={clearAll} />
           </div>
         )}
@@ -218,9 +221,9 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed py-12 px-6 text-center">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="text-xs text-muted-foreground max-w-sm">{body}</p>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 px-6 text-center">
+      <h2 className="font-display text-3xl text-foreground">{title}</h2>
+      <p className="text-sm text-muted-foreground max-w-sm">{body}</p>
       {action}
     </div>
   );

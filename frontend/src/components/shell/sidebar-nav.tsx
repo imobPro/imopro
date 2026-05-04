@@ -14,8 +14,10 @@ export function SidebarNav({ agentName }: { agentName: string }) {
   return (
     <aside className="hidden md:flex md:flex-col md:w-60 md:shrink-0 border-r bg-sidebar text-sidebar-foreground">
       <div className="px-6 py-5 border-b">
-        <p className="text-lg font-semibold">ImobPro</p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+        <p className="font-display text-2xl leading-none text-foreground">
+          ImobPro
+        </p>
+        <p className="text-xs text-muted-foreground mt-1.5 truncate">
           {agentName}
         </p>
       </div>
@@ -30,13 +32,20 @@ export function SidebarNav({ agentName }: { agentName: string }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                "transition-colors duration-fast ease-out-quart",
                 active
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "hover:bg-sidebar-accent/50 text-muted-foreground",
+                  : "hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="size-4" />
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary"
+                />
+              )}
+              <Icon className={cn("size-4", active && "text-primary")} />
               {item.label}
             </Link>
           );
@@ -47,7 +56,11 @@ export function SidebarNav({ agentName }: { agentName: string }) {
         <form action={signOutAction} className="flex-1">
           <button
             type="submit"
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-sidebar-accent/50 transition-colors"
+            className={cn(
+              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm",
+              "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground",
+              "transition-colors duration-fast",
+            )}
           >
             <LogOut className="size-4" />
             Sair

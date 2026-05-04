@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { STATUS_META, STATUS_ORDER } from "@/lib/domain/lead-enums";
+import { TONE_DOT_CLASS } from "@/lib/domain/tone-styles";
+import { cn } from "@/lib/utils";
 import type { LeadStatus } from "@/lib/types/database";
 import { updateStatusAction } from "./actions";
 
@@ -34,11 +36,25 @@ export function StatusSelector({ leadId, status }: Props) {
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
-          <Button variant="outline" size="sm" disabled={pending}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pending}
+            className="transition-colors duration-base ease-out-quart"
+          >
             {pending ? (
               <Loader2 className="animate-spin" />
             ) : (
-              <span className="font-medium">{meta.label}</span>
+              <>
+                <span
+                  aria-hidden
+                  className={cn(
+                    "size-2 rounded-full transition-colors duration-base",
+                    TONE_DOT_CLASS[meta.tone],
+                  )}
+                />
+                <span className="font-medium">{meta.label}</span>
+              </>
             )}
             <ChevronDown />
           </Button>
@@ -48,6 +64,13 @@ export function StatusSelector({ leadId, status }: Props) {
         <DropdownMenuRadioGroup value={status} onValueChange={handleChange}>
           {STATUS_ORDER.map((s) => (
             <DropdownMenuRadioItem key={s} value={s}>
+              <span
+                aria-hidden
+                className={cn(
+                  "mr-2 inline-block size-2 rounded-full",
+                  TONE_DOT_CLASS[STATUS_META[s].tone],
+                )}
+              />
               {STATUS_META[s].label}
             </DropdownMenuRadioItem>
           ))}

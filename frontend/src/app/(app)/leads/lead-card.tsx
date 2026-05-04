@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { ScoreBadge } from "@/components/ui/score-badge";
 import { cn } from "@/lib/utils";
 import {
   INTENT_META,
@@ -21,20 +22,31 @@ export function LeadCard({ lead }: { lead: LeadWithConversation }) {
   const intentMeta =
     lead.intent && lead.intent !== "desconhecido" ? INTENT_META[lead.intent] : null;
   const sentimentMeta = sentiment ? SENTIMENT_META[sentiment] : null;
+  const isHot = (lead.score ?? 0) >= 4;
 
   return (
     <Link
       href={`/inbox/${lead.id}`}
-      className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl group"
     >
       <Card
         size="sm"
         className={cn(
-          "flex-row items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/40",
+          "flex-row items-center gap-3 px-3 py-3",
+          "transition-all duration-fast ease-out-quart",
+          "hover:-translate-y-px hover:shadow-sm hover:bg-muted/40",
         )}
       >
-        <Avatar size="default">
-          <AvatarFallback>{initialsFrom(lead.name, lead.phone)}</AvatarFallback>
+        <Avatar
+          size="default"
+          className={cn(
+            "transition-shadow duration-base",
+            isHot && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
+          )}
+        >
+          <AvatarFallback className={cn(isHot && "bg-primary/15 text-primary")}>
+            {initialsFrom(lead.name, lead.phone)}
+          </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
@@ -42,15 +54,18 @@ export function LeadCard({ lead }: { lead: LeadWithConversation }) {
             {lead.name?.trim() || "Sem nome"}
           </p>
           <p className="text-xs text-muted-foreground truncate">
-            {formatPhoneBR(lead.phone)}
+            <span className="font-mono">{formatPhoneBR(lead.phone)}</span>
             {lead.region ? ` · ${lead.region}` : ""}
           </p>
         </div>
 
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {formatRelative(lead.last_message_at)}
-          </span>
+        <div className="flex flex-col items-end gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {formatRelative(lead.last_message_at)}
+            </span>
+            <ScoreBadge score={lead.score} />
+          </div>
           <div className="flex flex-wrap justify-end gap-1">
             {sentimentMeta && (
               <Badge variant={badgeVariantForTone(sentimentMeta.tone)}>

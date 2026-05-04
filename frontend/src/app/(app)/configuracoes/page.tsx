@@ -21,9 +21,11 @@ export default async function ConfiguracoesPage() {
   const settings = await getSettings(supabase);
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6 max-w-3xl">
+    <div className="flex flex-col gap-5 p-4 md:p-6 max-w-3xl">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Configurações</h1>
+        <h1 className="font-display text-3xl md:text-4xl text-foreground">
+          Configurações
+        </h1>
         <p className="text-sm text-muted-foreground">
           Defina como o agente atende seus leads. Mudanças passam a valer na
           próxima mensagem que o lead enviar.

@@ -46,12 +46,27 @@ export function ChatMessages({ messages, expanded }: Props) {
   if (messages.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground text-center max-w-sm">
-          Sem mensagens ainda nessa conversa.
-        </p>
+        <div className="flex flex-col items-center text-center max-w-sm gap-2">
+          <h2 className="font-display text-3xl text-foreground">
+            Sem mensagens ainda
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Quando o lead enviar a primeira mensagem, ela aparece aqui.
+          </p>
+          {!expanded && (
+            <Link
+              href="?expanded=1"
+              className="mt-3 text-sm text-primary underline-offset-4 hover:underline"
+            >
+              Ver histórico completo
+            </Link>
+          )}
+        </div>
       </div>
     );
   }
+
+  let bubbleIndex = 0;
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
@@ -59,7 +74,7 @@ export function ChatMessages({ messages, expanded }: Props) {
         <div className="flex justify-center pb-3">
           <Link
             href="?expanded=1"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline transition-colors duration-fast"
           >
             <ChevronUp className="size-3" />
             Ver mensagens anteriores
@@ -70,12 +85,16 @@ export function ChatMessages({ messages, expanded }: Props) {
         {groups.map((group) => (
           <div key={group.key} className="flex flex-col gap-2">
             <div className="flex justify-center">
-              <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground">
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground tabular-nums">
                 {group.label}
               </span>
             </div>
             {group.messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                index={bubbleIndex++}
+              />
             ))}
           </div>
         ))}

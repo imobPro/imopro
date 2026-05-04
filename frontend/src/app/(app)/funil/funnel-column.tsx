@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_META } from "@/lib/domain/lead-enums";
+import { TONE_DOT_CLASS } from "@/lib/domain/tone-styles";
 import type { LeadStatus, LeadWithConversation } from "@/lib/types/database";
 import { LeadCardMini } from "./lead-card-mini";
 
@@ -18,24 +18,38 @@ type Props = {
 export function FunnelColumn({ status, leads }: Props) {
   const meta = STATUS_META[status];
   const [open, setOpen] = useState(true);
+  const hasLeads = leads.length > 0;
 
   return (
-    <section className="flex flex-col rounded-xl border bg-card md:w-72 md:shrink-0">
+    <section
+      className={cn(
+        "flex flex-col rounded-xl border bg-card md:w-72 md:shrink-0",
+        "transition-shadow duration-base",
+        hasLeads && "shadow-xs",
+      )}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center justify-between gap-2 px-3 py-2 md:cursor-default md:pointer-events-none"
+        className="flex items-center justify-between gap-2 px-3 py-2.5 md:cursor-default md:pointer-events-none"
       >
         <span className="flex items-center gap-2 text-sm font-medium">
+          <span
+            aria-hidden
+            className={cn(
+              "size-2 rounded-full transition-colors duration-base",
+              TONE_DOT_CLASS[meta.tone],
+            )}
+          />
           {meta.label}
-          <Badge variant="secondary" className="tabular-nums">
+          <span className="inline-flex items-center justify-center min-w-5 px-1.5 h-5 rounded-full bg-muted text-muted-foreground text-[11px] tabular-nums">
             {leads.length}
-          </Badge>
+          </span>
         </span>
         <ChevronDown
           className={cn(
-            "size-4 text-muted-foreground transition-transform md:hidden",
+            "size-4 text-muted-foreground transition-transform duration-base ease-out-quart md:hidden",
             !open && "-rotate-90",
           )}
         />
@@ -48,8 +62,8 @@ export function FunnelColumn({ status, leads }: Props) {
         )}
       >
         {leads.length === 0 ? (
-          <p className="text-xs text-muted-foreground text-center py-4 px-2">
-            Nenhum lead nesse status.
+          <p className="font-display italic text-sm text-muted-foreground text-center py-6 px-2">
+            Nenhum lead aqui
           </p>
         ) : (
           <>

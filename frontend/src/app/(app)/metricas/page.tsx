@@ -21,9 +21,11 @@ export default async function MetricsPage() {
   const metrics = await getMetrics(supabase, agent.tenantId);
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
+    <div className="flex flex-col gap-5 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Métricas</h1>
+        <h1 className="font-display text-3xl md:text-4xl text-foreground">
+          Métricas
+        </h1>
         <p className="text-sm text-muted-foreground">
           Visão rápida do que está chegando, do que está fechando e do que precisa
           de atenção.
@@ -32,6 +34,7 @@ export default async function MetricsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
         <MetricCard
+          index={0}
           title="Leads novos"
           description="Por período de chegada"
           rows={[
@@ -41,6 +44,7 @@ export default async function MetricsPage() {
           ]}
         />
         <MetricCard
+          index={1}
           title="Em fechamento"
           description="Leads do mês por status atual"
           rows={[
@@ -49,6 +53,7 @@ export default async function MetricsPage() {
           ]}
         />
         <MetricCard
+          index={2}
           title="Leads parados"
           description="Sem mensagem há mais de 7 dias e ainda não fechados"
           highlight={{

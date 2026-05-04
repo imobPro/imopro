@@ -62,8 +62,8 @@ export function LeadEditDialog({ lead }: { lead: LeadWithConversation }) {
           </DialogDescription>
         </DialogHeader>
 
-        <form action={handleSubmit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
+        <form action={handleSubmit} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="lead-name">Nome</Label>
             <Input
               id="lead-name"
@@ -73,7 +73,7 @@ export function LeadEditDialog({ lead }: { lead: LeadWithConversation }) {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="lead-region">Região / bairro</Label>
             <Input
               id="lead-region"
@@ -83,13 +83,13 @@ export function LeadEditDialog({ lead }: { lead: LeadWithConversation }) {
             />
           </div>
 
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="lead-profile">Perfil</Label>
             <select
               id="lead-profile"
               name="profile"
               defaultValue={lead.profile ?? ""}
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+              className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               <option value="">Não definido</option>
               {PROFILE_OPTIONS.map((p) => (

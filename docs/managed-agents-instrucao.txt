@@ -1,0 +1,111 @@
+# Instrução — Migração para Managed Agents (Fase 4)
+
+Use este arquivo quando o ImobPro estiver em produção com clientes reais
+e a infraestrutura atual começar a mostrar limitações de escala.
+
+---
+
+## Quando migrar
+
+✅ Mais de 10 imobiliárias ativas simultâneas
+✅ Managed Agents fora de Research Preview (estável para produção)
+✅ BullMQ/Redis apresentando gargalos de performance
+✅ Custo de infraestrutura Railway justificando a migração
+
+---
+
+## O que muda na arquitetura
+
+HOJE:
+WhatsApp → Backend Node.js → BullMQ/Redis → Worker → Claude API
+
+COM MANAGED AGENTS:
+WhatsApp → Backend Node.js → Managed Agent Session → Claude API
+
+O que deixa de ser responsabilidade sua:
+- Loop de agente
+- Gerenciamento de contexto/histórico
+- Container de execução
+- Persistência de sessão
+
+---
+
+## Passo 1 — Criar o Agente Base
+
+Cole esse prompt no Claude Code:
+
+"Cria um Managed Agent para o ImobPro usando a Anthropic API.
+O agente deve ter:
+- model: claude-sonnet-4-6
+- system prompt: baseado no system prompt atual do ai-engine
+- tools: agent_toolset_20260401 (bash, web search, file ops)
+- header obrigatório: anthropic-beta: managed-agents-2026-04-01
+
+Referência: https://platform.claude.com/docs/en/managed-agents/overview"
+
+---
+
+## Passo 2 — Criar o Environment
+
+Cole esse prompt no Claude Code:
+
+"Cria um Environment para o ImobPro com:
+- tipo: cloud
+- networking: unrestricted
+- variáveis de ambiente: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ZAPI_TOKEN
+
+Salva o environment_id no .env como MANAGED_AGENT_ENV_ID"
+
+---
+
+## Passo 3 — Migrar o Worker
+
+Cole esse prompt no Claude Code:
+
+"Migra o whatsapp.worker.ts para usar Managed Agent Sessions.
+Cada conversa de lead deve ter sua própria session_id persistida no Supabase.
+O histórico de conversa passa a ser gerenciado server-side pela Anthropic.
+Remove a lógica manual de getHistory/appendHistory que hoje está no ai-engine.
+
+Mantém o BullMQ apenas para recepção de mensagens do webhook Z-API.
+O processamento passa para as sessions dos Managed Agents."
+
+---
+
+## Passo 4 — Ativar Memória Persistente
+
+Quando disponível fora de Research Preview:
+
+"Ativa o recurso Memory nos Managed Agents do ImobPro.
+Cada lead deve ter memória persistente entre sessões —
+o agente deve lembrar preferências e histórico mesmo após dias sem conversa.
+
+Referência: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview"
+
+---
+
+## Funcionalidades para ativar na Fase 4
+
+| Feature | O que entrega | Status atual |
+|---|---|---|
+| Memória persistente | Agente lembra o lead entre sessões | Research Preview |
+| Multi-agent | Agente de qualificação + agente de relatório simultâneos | Research Preview |
+| Outcomes | Define metas de resultado para o agente | Research Preview |
+
+---
+
+## Recursos oficiais para consultar
+
+- Visão geral: https://platform.claude.com/docs/en/managed-agents/overview
+- Ferramentas: https://platform.claude.com/docs/en/managed-agents/tools
+- API Reference: https://platform.claude.com/docs/en/api/beta/sessions
+- Agent Skills: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
+
+---
+
+## O que NÃO fazer
+
+❌ Migrar antes de ter clientes reais em produção
+❌ Migrar enquanto Managed Agents estiver em Research Preview
+❌ Substituir tudo de uma vez — migrar módulo por módulo
+❌ Remover o BullMQ antes de validar que as sessions funcionam
