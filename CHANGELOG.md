@@ -36,6 +36,59 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-04] — Sprint 8.5: Polimento pré-cliente
+
+**Fase:** Fase 2 — Painel web + relatórios
+**Duração:** ~2h
+
+### O que foi feito
+
+**Item 1 — Polimento de design no painel** (commit `9c34364`)
+- `DESIGN.md` na raiz como fonte da verdade do sistema visual: paleta OKLCH (âmbar dourado sobre stone tintado, sem cinza puro), tipografia pareada Geist + Instrument Serif, easings `ease-out-quart`/`expo`/`back`, escalas de duração, anti-pattern audit. `globals.css` reescrito com os novos tokens e `prefers-reduced-motion` zera animações.
+- Polimento aplicado em todas as superfícies: `/inbox` (bolhas, header sticky, status selector, lead-edit), `/leads`, `/funil`, `/metricas`, `/relatorios`, `/configuracoes`, `/login` e shell mobile/desktop. Componentes reutilizáveis novos: `ScoreBadge` e `tone-styles.ts`.
+- Skills de design adicionadas ao toolkit do projeto: `polish-impeccable`, `taste`, `animacoes-emil`. Instrução de Managed Agents (Fase 4) salva em `docs/managed-agents-instrucao.txt`.
+- Build validada: `next build` limpo, `tsc --noEmit` sem erros novos, anti-pattern greps zerados (emojis, gradientes ai-slop, `animate-bounce`, cores hardcoded).
+
+**Item 2 — Handoff conversacional preparatório**
+- Worker agora detecta `isHandoffActive` antes do passo de transferência: se há handoff em curso, pula `shouldTransferToHuman` e `analyzeSentiment`, chama `generateResponse({ handoffMode: true })`.
+- `buildHandoffPreparatorySystemPrompt(config)` em `ai-engine.prompts.ts`: tom paciente, IA responde dúvidas leves mas sempre fecha lembrando que o corretor já foi acionado. Proibido prometer prazo, depreciar o corretor ou pedir nova transferência.
+- `generateResponse` aceita `options.handoffMode`: usa prompt preparatório e descarta qualquer `[TRANSFER:]` que a IA inclua por engano.
+- Job `handoff-check` no expirar (15min) agora envia `buildHandoffTimeoutResumeMessage` ao lead via Z-API antes de limpar a flag — texto reconhece a espera sem prometer prazo nem depreciar o corretor.
+
+### Arquivos criados ou modificados
+- `DESIGN.md` (novo) — fonte da verdade do sistema visual
+- `frontend/src/app/globals.css` — tokens OKLCH, easings, reduced-motion
+- 21 arquivos do frontend (telas + shell + login) — aplicação dos tokens
+- `frontend/src/components/ui/score-badge.tsx` (novo)
+- `frontend/src/lib/domain/tone-styles.ts` (novo)
+- `skills/design/{polish-impeccable,taste,animacoes-emil}/` (novo) — skills de design
+- `docs/managed-agents-instrucao.txt` (novo) — referência para Fase 4
+- `src/modules/ai-engine/ai-engine.prompts.ts` — adiciona `buildHandoffPreparatorySystemPrompt`
+- `src/modules/ai-engine/ai-engine.service.ts` — `generateResponse` aceita `options.handoffMode`
+- `src/modules/ai-engine/ai-engine.types.ts` — `GenerateResponseOptions`
+- `src/modules/ai-engine/index.ts` — exporta `GenerateResponseOptions`
+- `src/modules/whatsapp/whatsapp.service.ts` — adiciona `buildHandoffTimeoutResumeMessage`
+- `src/modules/whatsapp/whatsapp.worker.ts` — branch handoff em curso + envio da mensagem de retomada na expiração
+- `src/tests/ai-engine.prompts.test.ts` — 5 testes do prompt preparatório
+- `src/tests/ai-engine.service.test.ts` — 3 testes de `generateResponse` com mock do Anthropic SDK
+- `src/tests/whatsapp.service.test.ts` — 2 testes da mensagem de retomada
+
+### Decisões tomadas
+- **Design**: âmbar dourado como acento (em vez do azul-corporativo padrão SaaS). Tinta stone (chroma 0.005–0.012) em vez de cinza puro. Display serif (Instrument Serif) só em heros, números grandes e empty states — UI em Geist Sans.
+- **Handoff item a1**: IA em modo preparatório responde dúvidas leves (informações gerais, processo) mas sempre fecha lembrando que o corretor vai retornar. Para perguntas que exigem decisão comercial (preço, proposta, agendamento), explica que cabe ao corretor.
+- **Handoff item b3**: texto da retomada — "Continuo à disposição. O corretor vai retornar assim que possível, e enquanto isso podemos seguir." Sem prazo específico, sem depreciar o corretor.
+- **Strip do `[TRANSFER:]` em handoffMode**: defesa em profundidade — o prompt já instrui a IA a não usar o marcador, mas se ela alucinar, o service ignora.
+
+### Pendências para próxima sessão
+- [ ] Validar visualmente o polimento no browser (Arthur faz — limitação do Claude)
+- [ ] Backlog técnico ainda em aberto: cap defensivo no `history`, prompt caching no Anthropic SDK quando system prompt passar de 1024 tokens, avaliar `gpt-4o-mini-transcribe` vs Whisper para PT-BR, reativar `attempts > 1` com flag "delivered" por job
+
+### Estado dos testes
+- 116 totais passando (antes: 106). +10 testes (5 prompt preparatório + 3 generateResponse mockando Anthropic + 2 mensagem de retomada)
+- 2 erros TS pré-existentes em `tenant-settings.service.test.ts` (Sprint 8) seguem presentes — não introduzidos por este ciclo
+
+---
+
 ## [2026-05-02] — Backlog técnico de hardening
 
 **Fase:** Fase 2 — Painel web + relatórios (entre Sprint 8 e 8.5)

@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 2 — Painel web (última sprint concluída: 8 + hardening de 2026-05-02)
-**Próximo passo:** Sprint 8.5 — Polimento pré-cliente
+**Fase:** 2 — Painel web (última sprint concluída: 8.5 em 2026-05-04)
+**Próximo passo:** Backlog técnico restante (cap defensivo no history, prompt caching, gpt-4o-mini-transcribe) ou avançar para Fase 3
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -109,8 +109,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 - 🔁 Token Z-API por tenant — adiado para Fase 3 (entrevista decidiu cadastro via SQL no piloto)
 
 ### Sprint 8.5 — Polimento pré-cliente
-- [ ] Aplicar design skills no painel antes da primeira demo (Emil Kowalski animation, Impeccable `/polish`, Taste skill) — referência: `docs/design-skills-instrucao.txt`
-- [ ] Handoff conversacional preparatório: nos 15 min entre transferência e o corretor assumir, IA mantém tom "preparando entrada do corretor" em vez de silêncio. Se o tempo estourar, mensagem de retomada reconhece a espera sem depreciar o corretor
+- ✅ 2026-05-04 Aplicar design skills no painel antes da primeira demo — DESIGN.md, paleta OKLCH âmbar/stone, Geist + Instrument Serif, easings ease-out-quart/expo/back, todas as superfícies tocadas, anti-pattern audit zerado
+- ✅ 2026-05-04 Handoff conversacional preparatório — `isHandoffActive` checado no worker; `generateResponse({ handoffMode: true })` usa prompt alternativo, descarta `[TRANSFER:]` e responde dúvidas leves sempre fechando que o corretor vai retornar; expiração de 15min envia `buildHandoffTimeoutResumeMessage` antes de limpar a flag
 
 ---
 

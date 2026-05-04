@@ -4,7 +4,12 @@ vi.mock('../shared/queue/redis', () => ({
   redisConnection: { set: vi.fn() },
 }))
 
-import { detectLeadProfile, shouldTransferToHuman, markMessageSeen } from '../modules/whatsapp/whatsapp.service'
+import {
+  detectLeadProfile,
+  shouldTransferToHuman,
+  markMessageSeen,
+  buildHandoffTimeoutResumeMessage,
+} from '../modules/whatsapp/whatsapp.service'
 import { redisConnection } from '../shared/queue/redis'
 import type { ConversationContext } from '../modules/whatsapp/whatsapp.types'
 
@@ -133,5 +138,23 @@ describe('markMessageSeen', () => {
     expect(b).toBe(true)
     expect(set).toHaveBeenNthCalledWith(1, 'seen_msg:tenant-1:msg-abc', '1', 'EX', 86400, 'NX')
     expect(set).toHaveBeenNthCalledWith(2, 'seen_msg:tenant-2:msg-abc', '1', 'EX', 86400, 'NX')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// buildHandoffTimeoutResumeMessage — retomada após 15min sem corretor
+// ---------------------------------------------------------------------------
+
+describe('buildHandoffTimeoutResumeMessage', () => {
+  it('reconhece a espera sem prometer prazo nem depreciar o corretor', () => {
+    const msg = buildHandoffTimeoutResumeMessage()
+    expect(msg).toContain('corretor')
+    expect(msg.toLowerCase()).not.toMatch(/minutos?\b|hora|breve|imediato/)
+    expect(msg.toLowerCase()).not.toMatch(/demor|ocupad|atras/)
+  })
+
+  it('mantém tom profissional sem cordialidade exagerada', () => {
+    const msg = buildHandoffTimeoutResumeMessage()
+    expect(msg).not.toMatch(/Claro!|Ótimo!|Com certeza!|Perfeito!/)
   })
 })

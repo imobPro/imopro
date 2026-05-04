@@ -1,9 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI, { toFile } from 'openai'
-import { buildSystemPrompt } from './ai-engine.prompts'
+import { buildSystemPrompt, buildHandoffPreparatorySystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
   AIResponse,
+  GenerateResponseOptions,
   IntentType,
   PendingMessage,
   TransferReason,
@@ -113,7 +114,10 @@ export async function generateResponse(
   config: AgentConfig,
   tenantId: string,
   phone: string,
+  options: GenerateResponseOptions = {},
 ): Promise<AIResponse> {
+  const handoffMode = options.handoffMode === true
+
   const userLines: string[] = []
 
   for (const msg of pendingMessages) {
@@ -140,12 +144,16 @@ export async function generateResponse(
     { role: 'user' as const, content: userContent },
   ]
 
+  const systemPrompt = handoffMode
+    ? buildHandoffPreparatorySystemPrompt(config)
+    : buildSystemPrompt(config)
+
   let rawText: string
   try {
     const result = await getAnthropic().messages.create({
       model: MODEL,
       max_tokens: 512,
-      system: buildSystemPrompt(config),
+      system: systemPrompt,
       messages: apiMessages,
     })
 
@@ -157,10 +165,22 @@ export async function generateResponse(
     throw err
   }
 
-  const { cleanText, shouldTransfer, transferReason } = parseTransfer(rawText)
+  const parsed = parseTransfer(rawText)
   const intent = detectIntent(userContent)
 
-  console.log(`[AI] Resposta gerada | tenant=${tenantId} phone=${phone} intent=${intent} transfer=${shouldTransfer}`)
+  // Em handoffMode descartamos qualquer marker [TRANSFER:] que a IA tenha incluído por engano —
+  // o lead já está em handoff, novo pedido seria duplicidade.
+  if (handoffMode) {
+    console.log(`[AI] Resposta gerada (handoff) | tenant=${tenantId} phone=${phone} intent=${intent}`)
+    return { text: parsed.cleanText, intent, shouldTransfer: false }
+  }
 
-  return { text: cleanText, intent, shouldTransfer, transferReason }
+  console.log(`[AI] Resposta gerada | tenant=${tenantId} phone=${phone} intent=${intent} transfer=${parsed.shouldTransfer}`)
+
+  return {
+    text: parsed.cleanText,
+    intent,
+    shouldTransfer: parsed.shouldTransfer,
+    transferReason: parsed.transferReason,
+  }
 }

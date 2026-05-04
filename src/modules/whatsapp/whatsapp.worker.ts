@@ -10,6 +10,7 @@ import {
   popPendingMessages,
   buildSentimentWaitMessage,
   buildCorretorAlert,
+  buildHandoffTimeoutResumeMessage,
 } from './whatsapp.service'
 import { generateResponse } from '../ai-engine'
 import {
@@ -112,6 +113,17 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
         const active = await isHandoffActive(tenantId, phone)
         if (active) {
           console.log(`[Worker] Corretor não assumiu | tenant=${tenantId} phone=${phone} — IA retoma`)
+          const instanceToken = process.env.ZAPI_TOKEN
+          const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
+          if (zapi) {
+            try {
+              await zapi.sendText({ phone, message: buildHandoffTimeoutResumeMessage() })
+              console.log(`[Worker] Mensagem de retomada enviada | phone=${phone}`)
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              console.error(`[Worker] Falha ao enviar mensagem de retomada | ${msg}`)
+            }
+          }
           await clearHandoff(tenantId, phone)
           console.log(`[Worker] ALERTA CORRETOR: lead ${phone} (tenant ${tenantId}) sem atendimento após 15min`)
         } else {
@@ -202,6 +214,60 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
       }))
 
       const history = await getConversationHistory(tenantId, lead.id).catch(() => [])
+
+      // 5b. Handoff em curso: usar prompt preparatório, não reabrir transferência nem rodar sentimento.
+      // Lead já foi transferido; nesta janela de 15min a IA conduz a espera.
+      if (await isHandoffActive(tenantId, phone)) {
+        console.log(`[Worker] Handoff em curso | tenant=${tenantId} phone=${phone} — modo preparatório`)
+        const config = buildAgentConfig(settings)
+
+        let aiResponse
+        try {
+          aiResponse = await generateResponse(pendingMessages, history, config, tenantId, phone, {
+            handoffMode: true,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.error(`[Worker] Falha na IA (handoff) | ${msg}`)
+          return
+        }
+
+        if (zapi) {
+          try {
+            await zapi.sendText({ phone, message: aiResponse.text })
+            console.log(`[Worker] Resposta preparatória enviada | phone=${phone}`)
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.error(`[Worker] Falha ao enviar resposta preparatória | ${msg}`)
+          }
+        } else {
+          console.log(`[Worker] [DEV] Resposta IA (handoff) | phone=${phone}\n${aiResponse.text}`)
+        }
+
+        try {
+          const incomingMessages: IncomingMessage[] = pendingMessages
+            .filter((m) => m.text || m.mediaUrl)
+            .map((m) => ({
+              zapiMessageId: `${data.messageId}-${m.timestamp}`,
+              content: m.text ?? '',
+              type: m.type,
+              mediaUrl: m.mediaUrl,
+            }))
+
+          await saveConversationMessages({
+            tenantId,
+            leadId: lead.id,
+            incomingMessages,
+            aiResponseText: aiResponse.text,
+            aiFailedAttempts: 0,
+          })
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          console.error(`[Worker] Falha ao persistir mensagens (handoff) | ${msg}`)
+        }
+
+        return
+      }
 
       // 6a. Verificar gatilhos de transferência (inclui urgência por keywords)
       const context: ConversationContext = {

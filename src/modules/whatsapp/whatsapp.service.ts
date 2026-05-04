@@ -240,6 +240,12 @@ export function buildCorretorAlert(leadPhone: string, tenantId: string): string 
   return `[ImobPro] Atencao: o lead ${leadPhone} (tenant: ${tenantId}) demonstra insatisfacao na conversa. Acesse o painel para assumir o atendimento.`
 }
 
+// Mensagem de retomada quando o corretor não assume em 15min após handoff.
+// Reconhece a espera sem prometer prazo nem depreciar o corretor.
+export function buildHandoffTimeoutResumeMessage(): string {
+  return 'Continuo à disposição. O corretor vai retornar assim que possível, e enquanto isso podemos seguir.'
+}
+
 // ---------------------------------------------------------------------------
 // Mensagem de retorno fora do horário comercial
 // ---------------------------------------------------------------------------

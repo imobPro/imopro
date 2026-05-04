@@ -40,3 +40,9 @@ export interface PendingMessage {
   type: 'text' | 'audio' | 'image' | 'document' | 'sticker' | 'location'
   timestamp: number
 }
+
+export interface GenerateResponseOptions {
+  // Quando true, IA usa o prompt preparatório (handoff em curso): conduz a espera,
+  // não pede nova transferência, descarta marker [TRANSFER:] se aparecer.
+  handoffMode?: boolean
+}
