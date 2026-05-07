@@ -13,40 +13,12 @@ import {
   getAgentVisibility,
 } from '../modules/tenant-settings/tenant-settings.service'
 import { HttpError } from '../shared/errors/http-error'
+import { queueFromResponses } from './helpers/supabase-mock'
 
-type QueryResult = { data: unknown; error: unknown }
-
-function chain(result: QueryResult, captureUpdate?: (update: unknown) => void) {
-  const self: Record<string, unknown> = {
-    select: () => self,
-    eq: () => self,
-    update: (payload: unknown) => {
-      captureUpdate?.(payload)
-      return self
-    },
-    maybeSingle: () => Promise.resolve(result),
-    single: () => Promise.resolve(result),
-    then: (onFulfilled: (v: QueryResult) => unknown) =>
-      Promise.resolve(result).then(onFulfilled),
-  }
-  return self
-}
-
-function queueFromResponses(
-  responses: QueryResult[],
-  captures?: Array<(update: unknown) => void>
-) {
-  const queue = [...responses]
-  const captureQueue = [...(captures ?? [])]
-  ;(supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-    const next = queue.shift() ?? { data: null, error: null }
-    const cap = captureQueue.shift()
-    return chain(next, cap) as ReturnType<typeof chain>
-  })
-}
+const fromMock = supabase.from as ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  ;(supabase.from as ReturnType<typeof vi.fn>).mockReset()
+  fromMock.mockReset()
 })
 
 // ---------------------------------------------------------------------------
@@ -55,7 +27,7 @@ beforeEach(() => {
 
 describe('getTenantSettings', () => {
   it('retorna defaults quando linha não existe', async () => {
-    queueFromResponses([{ data: null, error: null }])
+    queueFromResponses(fromMock, [{ data: null, error: null }])
 
     const settings = await getTenantSettings('tenant-A')
 
@@ -72,7 +44,7 @@ describe('getTenantSettings', () => {
   })
 
   it('mapeia linha do banco para o tipo TenantSettings', async () => {
-    queueFromResponses([
+    queueFromResponses(fromMock, [
       {
         data: {
           agent_name: 'Júlia',
@@ -99,7 +71,7 @@ describe('getTenantSettings', () => {
   })
 
   it('cai em defaults se o supabase retornar erro', async () => {
-    queueFromResponses([{ data: null, error: { message: 'boom' } }])
+    queueFromResponses(fromMock, [{ data: null, error: { message: 'boom' } }])
 
     const settings = await getTenantSettings('tenant-C')
 
@@ -123,7 +95,7 @@ describe('updateTenantSettings', () => {
   })
 
   it('rejeita end <= start considerando estado atual', async () => {
-    queueFromResponses([
+    queueFromResponses(fromMock, [
       // chamada interna do getTenantSettings (validação cruzada)
       {
         data: {
@@ -145,6 +117,7 @@ describe('updateTenantSettings', () => {
   it('persiste somente as chaves convertidas snake_case', async () => {
     const captures: unknown[] = []
     queueFromResponses(
+      fromMock,
       [
         // getTenantSettings (validação cruzada)
         {
@@ -198,6 +171,7 @@ describe('updateAgentVisibility', () => {
   it('faz merge ignorando chaves desconhecidas e tipos inválidos', async () => {
     const captures: unknown[] = []
     queueFromResponses(
+      fromMock,
       [
         // getAgentVisibility (lê current)
         { data: { settings_visibility: { identity: false } }, error: null },
@@ -220,7 +194,7 @@ describe('updateAgentVisibility', () => {
   })
 
   it('retorna {} quando o agent não tem coluna populada', async () => {
-    queueFromResponses([{ data: null, error: null }])
+    queueFromResponses(fromMock, [{ data: null, error: null }])
     const v = await getAgentVisibility('agent-x')
     expect(v).toEqual({})
   })
@@ -233,7 +207,7 @@ describe('updateAgentVisibility', () => {
 describe('updateAgentPhone', () => {
   it('aceita formato com símbolos e persiste só dígitos', async () => {
     const captures: unknown[] = []
-    queueFromResponses([{ data: null, error: null }], [(p) => captures.push(p)])
+    queueFromResponses(fromMock, [{ data: null, error: null }], [(p) => captures.push(p)])
 
     const saved = await updateAgentPhone('agent-1', '+55 (21) 98888-7777')
 

@@ -10,32 +10,12 @@ import {
   findActiveAgentByUserId,
   AgentLookupError,
 } from '../modules/agents/agents.service'
+import { queueFromResponses } from './helpers/supabase-mock'
 
-type QueryResult = { data: unknown; error: unknown }
-
-function chain(result: QueryResult) {
-  const self = {
-    select: () => self,
-    eq: () => self,
-    not: () => self,
-    order: () => self,
-    limit: () => self,
-    maybeSingle: () => Promise.resolve(result),
-    single: () => Promise.resolve(result),
-  }
-  return self
-}
-
-function queueFromResponses(...responses: QueryResult[]) {
-  const queue = [...responses]
-  ;(supabase.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-    const next = queue.shift() ?? { data: null, error: null }
-    return chain(next)
-  })
-}
+const fromMock = supabase.from as ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  (supabase.from as ReturnType<typeof vi.fn>).mockReset()
+  fromMock.mockReset()
 })
 
 // ---------------------------------------------------------------------------
@@ -44,10 +24,10 @@ beforeEach(() => {
 
 describe('getHandoffTargetPhone', () => {
   it('retorna o agent atribuído ao lead quando está ativo e tem phone', async () => {
-    queueFromResponses(
+    queueFromResponses(fromMock, [
       { data: { agent_id: 'agent-1' }, error: null },
-      { data: { id: 'agent-1', phone: '5521988887777', active: true }, error: null }
-    )
+      { data: { id: 'agent-1', phone: '5521988887777', active: true }, error: null },
+    ])
 
     const result = await getHandoffTargetPhone('tenant-A', 'lead-1')
 
@@ -55,11 +35,11 @@ describe('getHandoffTargetPhone', () => {
   })
 
   it('cai no fallback quando o agent atribuído está inativo', async () => {
-    queueFromResponses(
+    queueFromResponses(fromMock, [
       { data: { agent_id: 'agent-1' }, error: null },
       { data: { id: 'agent-1', phone: '5521988887777', active: false }, error: null },
-      { data: { id: 'agent-2', phone: '5521977776666' }, error: null }
-    )
+      { data: { id: 'agent-2', phone: '5521977776666' }, error: null },
+    ])
 
     const result = await getHandoffTargetPhone('tenant-A', 'lead-1')
 
@@ -67,10 +47,10 @@ describe('getHandoffTargetPhone', () => {
   })
 
   it('usa fallback quando o lead não tem agent_id', async () => {
-    queueFromResponses(
+    queueFromResponses(fromMock, [
       { data: { agent_id: null }, error: null },
-      { data: { id: 'agent-fallback', phone: '5521966665555' }, error: null }
-    )
+      { data: { id: 'agent-fallback', phone: '5521966665555' }, error: null },
+    ])
 
     const result = await getHandoffTargetPhone('tenant-A', 'lead-2')
 
@@ -78,11 +58,11 @@ describe('getHandoffTargetPhone', () => {
   })
 
   it('cai no fallback quando o agent atribuído existe mas não tem phone', async () => {
-    queueFromResponses(
+    queueFromResponses(fromMock, [
       { data: { agent_id: 'agent-1' }, error: null },
       { data: { id: 'agent-1', phone: null, active: true }, error: null },
-      { data: { id: 'agent-2', phone: '5521955554444' }, error: null }
-    )
+      { data: { id: 'agent-2', phone: '5521955554444' }, error: null },
+    ])
 
     const result = await getHandoffTargetPhone('tenant-A', 'lead-3')
 
@@ -90,10 +70,10 @@ describe('getHandoffTargetPhone', () => {
   })
 
   it('retorna null quando não há nenhum agent ativo com phone', async () => {
-    queueFromResponses(
+    queueFromResponses(fromMock, [
       { data: null, error: null },
-      { data: null, error: null }
-    )
+      { data: null, error: null },
+    ])
 
     const result = await getHandoffTargetPhone('tenant-A', 'lead-4')
 
@@ -107,10 +87,12 @@ describe('getHandoffTargetPhone', () => {
 
 describe('findActiveAgentByUserId', () => {
   it('retorna o agent quando ativo', async () => {
-    queueFromResponses({
-      data: { id: 'agent-1', tenant_id: 'tenant-A', active: true },
-      error: null,
-    })
+    queueFromResponses(fromMock, [
+      {
+        data: { id: 'agent-1', tenant_id: 'tenant-A', active: true },
+        error: null,
+      },
+    ])
 
     const result = await findActiveAgentByUserId('user-1')
 
@@ -119,7 +101,7 @@ describe('findActiveAgentByUserId', () => {
 
   it('retorna null quando o user não tem agent ativo', async () => {
     // Query agora filtra por active=true direto no banco, então o resultado é simplesmente "no rows"
-    queueFromResponses({ data: null, error: null })
+    queueFromResponses(fromMock, [{ data: null, error: null }])
 
     const result = await findActiveAgentByUserId('user-x')
 
@@ -127,7 +109,7 @@ describe('findActiveAgentByUserId', () => {
   })
 
   it('lança AgentLookupError em caso de erro do Supabase', async () => {
-    queueFromResponses({ data: null, error: { message: 'boom' } })
+    queueFromResponses(fromMock, [{ data: null, error: { message: 'boom' } }])
 
     await expect(findActiveAgentByUserId('user-1')).rejects.toBeInstanceOf(AgentLookupError)
   })

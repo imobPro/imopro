@@ -12,35 +12,14 @@ import {
   getAvgQualificationHours,
   getAvgClosingHours,
 } from '../modules/reports/reports.metrics'
+import { mockFromOnce, type QueryResult } from './helpers/supabase-mock'
 
-type QueryResult = { data?: unknown; error?: unknown; count?: number | null }
+const fromMock = supabase.from as ReturnType<typeof vi.fn>
 
-function chain(result: QueryResult) {
-  const self: Record<string, unknown> = {}
-  const wrap = () => self
-  Object.assign(self, {
-    select: wrap,
-    eq: wrap,
-    gte: wrap,
-    lt: wrap,
-    not: wrap,
-    is: wrap,
-    order: wrap,
-    limit: wrap,
-    maybeSingle: () => Promise.resolve(result),
-    single: () => Promise.resolve(result),
-    // PostgREST head:true leaves the chain awaitable
-    then: (resolve: (v: QueryResult) => void) => resolve(result),
-  })
-  return self
-}
-
-function mockOnce(result: QueryResult) {
-  ;(supabase.from as ReturnType<typeof vi.fn>).mockImplementationOnce(() => chain(result))
-}
+const mockOnce = (result: QueryResult) => mockFromOnce(fromMock, result)
 
 beforeEach(() => {
-  ;(supabase.from as ReturnType<typeof vi.fn>).mockReset()
+  fromMock.mockReset()
 })
 
 // ---------------------------------------------------------------------------
