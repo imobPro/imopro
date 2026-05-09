@@ -120,3 +120,66 @@ describe('generateResponse — handoffMode', () => {
     expect(response.text).not.toContain('[TRANSFER:')
   })
 })
+
+describe('generateResponse — cap defensivo no history', () => {
+  beforeEach(() => {
+    messagesCreate.mockReset()
+  })
+
+  it('trim history para 30 mensagens quando excede e mantém as mais recentes', async () => {
+    messagesCreate.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'ok' }],
+    })
+
+    const longHistory = Array.from({ length: 100 }, (_, i) => ({
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: `msg-${i}`,
+    }))
+
+    await generateResponse(
+      [userMessage('nova')],
+      longHistory,
+      baseConfig(),
+      'tenant-1',
+      '5521999999999',
+    )
+
+    const sentMessages = messagesCreate.mock.calls[0][0].messages as Array<{
+      role: string
+      content: string
+    }>
+    // 30 do histórico + 1 nova mensagem do usuário
+    expect(sentMessages).toHaveLength(31)
+    // slice(-30) deve manter msg-70 ... msg-99 (as mais recentes)
+    expect(sentMessages[0].content).toBe('msg-70')
+    expect(sentMessages[29].content).toBe('msg-99')
+    expect(sentMessages[30].content).toBe('nova')
+  })
+
+  it('preserva history inteiro quando está dentro do limite', async () => {
+    messagesCreate.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'ok' }],
+    })
+
+    const shortHistory = Array.from({ length: 5 }, (_, i) => ({
+      role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
+      content: `msg-${i}`,
+    }))
+
+    await generateResponse(
+      [userMessage('nova')],
+      shortHistory,
+      baseConfig(),
+      'tenant-1',
+      '5521999999999',
+    )
+
+    const sentMessages = messagesCreate.mock.calls[0][0].messages as Array<{
+      role: string
+      content: string
+    }>
+    expect(sentMessages).toHaveLength(6)
+    expect(sentMessages[0].content).toBe('msg-0')
+    expect(sentMessages[5].content).toBe('nova')
+  })
+})

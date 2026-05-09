@@ -14,6 +14,11 @@ const MODEL = process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-sonnet-4-6'
 const AUDIO_FALLBACK_MESSAGE =
   'Não consegui entender bem sua mensagem. Pode me enviar novamente ou escrever o que precisa?'
 
+// Cap defensivo: getConversationHistory usa LIMIT 20 por padrão, mas o caller
+// pode pedir mais ou a RPC pode mudar. A fronteira de confiança fica aqui —
+// nunca enviar mais do que MAX_HISTORY_MESSAGES turnos para a IA.
+const MAX_HISTORY_MESSAGES = 30
+
 const VALID_TRANSFER_REASONS: readonly TransferReason[] = [
   'pedido_explicito',
   'intencao_fechamento',
@@ -139,8 +144,11 @@ export async function generateResponse(
 
   const userContent = userLines.join('\n')
 
+  const trimmedHistory =
+    history.length > MAX_HISTORY_MESSAGES ? history.slice(-MAX_HISTORY_MESSAGES) : history
+
   const apiMessages: Anthropic.MessageParam[] = [
-    ...history.map((m) => ({ role: m.role, content: m.content })),
+    ...trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
     { role: 'user' as const, content: userContent },
   ]
 
