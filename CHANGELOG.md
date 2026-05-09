@@ -36,6 +36,28 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-09] — Pendências do Sprint 6 fechadas
+
+**Fase:** Fase 2 — Painel web + relatórios
+**Duração:** ~30min
+
+### O que foi feito
+
+- **Indicador "não lido" na lista de leads**: `LeadCard` deriva `unread = !last_viewed_at || last_viewed_at < last_message_at`. Quando true, exibe ponto âmbar (`size-1.5 rounded-full bg-primary`) à esquerda do nome e troca o nome de `font-medium` para `font-semibold`. Card mantém o mesmo footprint visual; ciclo de leitura já existia via `markAsViewedAction`.
+- **`outputFileTracingRoot` em `next.config.ts`**: aponta para `import.meta.dirname` (Node 24, ESM nativo). Resolve o aviso "multiple lockfiles detected" do Next 16 sem precisar fundir lockfiles — backend (raiz) e frontend (`frontend/`) seguem com seus `package-lock.json` independentes, que é o correto.
+
+### Arquivos modificados
+- `frontend/src/app/(app)/leads/lead-card.tsx` — função `isUnread` + ponto âmbar + nome semibold
+- `frontend/next.config.ts` — `outputFileTracingRoot: import.meta.dirname`
+- `PLAN.md` — pendências do Sprint 6 marcadas como resolvidas
+
+### Validação
+- `npx tsc --noEmit` limpo
+- `npm run build` limpo, sem aviso de lockfile
+- Validação visual no browser: pendente (limitação Claude — Arthur faz)
+
+---
+
 ## [2026-05-04] — Sprint 8.5: Polimento pré-cliente
 
 **Fase:** Fase 2 — Painel web + relatórios

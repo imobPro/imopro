@@ -111,6 +111,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 ### Sprint 8.5 — Polimento pré-cliente
 - ✅ 2026-05-04 Aplicar design skills no painel antes da primeira demo — DESIGN.md, paleta OKLCH âmbar/stone, Geist + Instrument Serif, easings ease-out-quart/expo/back, todas as superfícies tocadas, anti-pattern audit zerado
 - ✅ 2026-05-04 Handoff conversacional preparatório — `isHandoffActive` checado no worker; `generateResponse({ handoffMode: true })` usa prompt alternativo, descarta `[TRANSFER:]` e responde dúvidas leves sempre fechando que o corretor vai retornar; expiração de 15min envia `buildHandoffTimeoutResumeMessage` antes de limpar a flag
+- ✅ 2026-05-09 Indicador "não lido" na lista de leads — ponto âmbar + nome semibold quando `last_viewed_at < last_message_at` (ou nunca visto)
+- ✅ 2026-05-09 `outputFileTracingRoot` em `frontend/next.config.ts` — silencia o aviso "multiple lockfiles" do Next 16 sem mexer nos lockfiles legítimos de backend e frontend
 
 ---
 

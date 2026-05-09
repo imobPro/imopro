@@ -17,12 +17,19 @@ function pickSentiment(lead: LeadWithConversation): Sentiment | null {
   return conv?.sentiment ?? null;
 }
 
+function isUnread(lead: LeadWithConversation): boolean {
+  if (!lead.last_message_at) return false;
+  if (!lead.last_viewed_at) return true;
+  return lead.last_viewed_at < lead.last_message_at;
+}
+
 export function LeadCard({ lead }: { lead: LeadWithConversation }) {
   const sentiment = pickSentiment(lead);
   const intentMeta =
     lead.intent && lead.intent !== "desconhecido" ? INTENT_META[lead.intent] : null;
   const sentimentMeta = sentiment ? SENTIMENT_META[sentiment] : null;
   const isHot = (lead.score ?? 0) >= 4;
+  const unread = isUnread(lead);
 
   return (
     <Link
@@ -50,8 +57,16 @@ export function LeadCard({ lead }: { lead: LeadWithConversation }) {
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
-            {lead.name?.trim() || "Sem nome"}
+          <p className="text-sm truncate flex items-center gap-1.5">
+            {unread && (
+              <span
+                aria-label="Não lido"
+                className="size-1.5 rounded-full bg-primary shrink-0"
+              />
+            )}
+            <span className={cn("truncate", unread ? "font-semibold" : "font-medium")}>
+              {lead.name?.trim() || "Sem nome"}
+            </span>
           </p>
           <p className="text-xs text-muted-foreground truncate">
             <span className="font-mono">{formatPhoneBR(lead.phone)}</span>
