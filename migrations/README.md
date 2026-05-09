@@ -12,6 +12,8 @@ Aplique em ordem crescente no Supabase: **Dashboard → SQL Editor → colar cad
 | 006 | `006_rls_helper_functions.sql` | Quebra recursão infinita da RLS via funções `SECURITY DEFINER` (`auth_tenant_ids`, `auth_agent_ids`). Reescreve todas as policies pra usar os helpers. |
 | 007 | `007_lead_view_state.sql` | `leads.last_viewed_at` — marca quando o painel abriu a conversa do lead. Per-tenant. |
 | 008 | `008_reports_and_inactive_status.sql` | Status `inativo` na enum `lead_status`, colunas `qualified_at`/`closed_at` em `leads`, tabela `reports` (mensal/semanal por agent), bucket Storage `reports` privado. Sprint 7. **Aplicada no Supabase em 2026-05-01.** |
+| 009 | `009_tenant_settings.sql` | Colunas de configuração em `tenants` (agent_name, realty_name, welcome_message, business_hours_*, agent_active) + `agents.settings_visibility jsonb`. Sprint 8. **Aplicada no Supabase em 2026-05-02.** |
+| 010 | `010_history_rpc.sql` | RPC `get_conversation_history(tenant_id, lead_id, limit)` substitui o lookup duplo conversation+messages por 1 round-trip. Backlog técnico. **Aplicada no Supabase em 2026-05-09.** |
 
 ## Criar primeiro usuário de teste (Sprint 6)
 
