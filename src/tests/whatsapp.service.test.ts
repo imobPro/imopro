@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../shared/queue/redis', () => ({
-  redisConnection: { set: vi.fn() },
+  redisConnection: { set: vi.fn(), del: vi.fn() },
 }))
 
 import {
@@ -9,9 +9,10 @@ import {
   shouldTransferToHuman,
   markMessageSeen,
   buildHandoffTimeoutResumeMessage,
+  sendTextOnce,
 } from '../modules/whatsapp/whatsapp.service'
 import { redisConnection } from '../shared/queue/redis'
-import type { ConversationContext } from '../modules/whatsapp/whatsapp.types'
+import type { ConversationContext, ZApiClient } from '../modules/whatsapp/whatsapp.types'
 
 // ---------------------------------------------------------------------------
 // detectLeadProfile
@@ -156,5 +157,79 @@ describe('buildHandoffTimeoutResumeMessage', () => {
   it('mantém tom profissional sem cordialidade exagerada', () => {
     const msg = buildHandoffTimeoutResumeMessage()
     expect(msg).not.toMatch(/Claro!|Ótimo!|Com certeza!|Perfeito!/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// sendTextOnce — envio idempotente ao lead
+// ---------------------------------------------------------------------------
+
+describe('sendTextOnce', () => {
+  const set = redisConnection.set as ReturnType<typeof vi.fn>
+  const del = redisConnection.del as ReturnType<typeof vi.fn>
+  const sendText = vi.fn()
+  const zapi: ZApiClient = { sendText }
+
+  beforeEach(() => {
+    set.mockReset()
+    del.mockReset()
+    sendText.mockReset()
+  })
+
+  it('envia na primeira chamada e retorna true', async () => {
+    set.mockResolvedValueOnce('OK')
+    sendText.mockResolvedValueOnce(undefined)
+
+    const sent = await sendTextOnce(zapi, 'job-1', 'ai_response', {
+      phone: '5521999999999',
+      message: 'Olá',
+    })
+
+    expect(sent).toBe(true)
+    expect(sendText).toHaveBeenCalledWith({ phone: '5521999999999', message: 'Olá' })
+    expect(set).toHaveBeenCalledWith('once:job-1:sendText:ai_response', '1', 'EX', 86400, 'NX')
+    expect(del).not.toHaveBeenCalled()
+  })
+
+  it('pula o envio quando o slot (jobId, label) já foi marcado e retorna false', async () => {
+    set.mockResolvedValueOnce(null)
+
+    const sent = await sendTextOnce(zapi, 'job-1', 'ai_response', {
+      phone: '5521999999999',
+      message: 'Olá',
+    })
+
+    expect(sent).toBe(false)
+    expect(sendText).not.toHaveBeenCalled()
+  })
+
+  it('libera a flag e propaga o erro quando sendText falha — próximo retry pode reenviar', async () => {
+    set.mockResolvedValueOnce('OK')
+    del.mockResolvedValueOnce(1)
+    sendText.mockRejectedValueOnce(new Error('zapi 500'))
+
+    await expect(
+      sendTextOnce(zapi, 'job-1', 'ai_response', { phone: '5521999999999', message: 'Olá' }),
+    ).rejects.toThrow('zapi 500')
+
+    expect(del).toHaveBeenCalledWith('once:job-1:sendText:ai_response')
+  })
+
+  it('isola por label — duas chamadas com labels diferentes no mesmo jobId enviam', async () => {
+    set.mockResolvedValueOnce('OK').mockResolvedValueOnce('OK')
+    sendText.mockResolvedValue(undefined)
+
+    const a = await sendTextOnce(zapi, 'job-1', 'ai_response', {
+      phone: '5521999999999',
+      message: 'A',
+    })
+    const b = await sendTextOnce(zapi, 'job-1', 'sentiment_wait_urgent', {
+      phone: '5521999999999',
+      message: 'B',
+    })
+
+    expect(a).toBe(true)
+    expect(b).toBe(true)
+    expect(sendText).toHaveBeenCalledTimes(2)
   })
 })

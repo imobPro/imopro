@@ -7,12 +7,13 @@ export const WHATSAPP_QUEUE_NAME = 'whatsapp-messages'
 export const whatsappQueue = new Queue<WhatsAppMessageJob>(WHATSAPP_QUEUE_NAME, {
   connection: redisConnection,
   defaultJobOptions: {
-    // attempts=1: o pipeline ainda não tem flag "delivered" por job. Reativar
-    // retry exige marcar no banco/Redis que zapi.sendText já foi chamado, para
-    // que retentativas após stalled detection não enviem mensagem em duplicata.
-    // Defesas atuais contra reentrega: dedup pré-fila por messageId (controller)
-    // + UNIQUE(zapi_message_id) na tabela messages.
-    attempts: 1,
+    // attempts=3 com backoff exponencial. Cada side effect não-idempotente do
+    // worker (zapi.sendText e scoreUp) é envolto em runOnce(jobId, label) para
+    // que retries após stalled detection não dupliquem envio nem score.
+    // Defesas em camadas: dedup pré-fila por messageId (controller) + flags
+    // por (jobId, label) no Redis + UNIQUE(zapi_message_id) na tabela messages.
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 30_000 }, // 30s → 1min → 2min
     removeOnComplete: 100, // mantém os últimos 100 jobs concluídos
     removeOnFail: 500,     // mantém os últimos 500 jobs com falha para diagnóstico
   },

@@ -1,5 +1,6 @@
 import { whatsappQueue } from '../../shared/queue/queues'
 import { redisConnection } from '../../shared/queue/redis'
+import { runOnce } from '../../shared/queue/idempotency'
 import { getNextBusinessDay, type BusinessHoursConfig } from '../../shared/utils/business-hours'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
 import type { PendingMessage } from '../ai-engine/ai-engine.types'
@@ -56,7 +57,6 @@ export async function enqueueMessage(
   await redisConnection.expire(pendingKey, PENDING_TTL_SECONDS)
 
   const triggerJob: WhatsAppMessageJob = {
-    jobId: debounceId,
     tenantId,
     instanceId: payload.instanceId,
     phone: payload.phone,
@@ -268,6 +268,24 @@ export function getBusinessHoursMessage(
 // ---------------------------------------------------------------------------
 // Z-API client — envio de mensagens
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Envio idempotente ao lead
+// ---------------------------------------------------------------------------
+// Cada (jobId, label) só dispara um sendText. O jobId aqui é o id interno do
+// BullMQ (gerado por Worker, único por job e estável em retries do mesmo job).
+// Reentregas após stalled pulam o envio. Em caso de erro durante o sendText,
+// runOnce libera a flag para que o próximo retry do BullMQ possa reenviar.
+
+export async function sendTextOnce(
+  zapi: ZApiClient,
+  jobId: string,
+  label: string,
+  payload: ZApiSendTextPayload,
+): Promise<boolean> {
+  const result = await runOnce(jobId, `sendText:${label}`, () => zapi.sendText(payload))
+  return result.ran
+}
 
 export function buildZApiClient(instanceId: string, token: string): ZApiClient {
   const baseUrl = process.env.ZAPI_BASE_URL ?? 'https://api.z-api.io'

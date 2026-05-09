@@ -1,7 +1,6 @@
 export type MessageType = 'text' | 'audio' | 'image' | 'document' | 'sticker' | 'location'
 
 export interface WhatsAppMessageJob {
-  jobId: string
   tenantId: string        // client_id — isolamento multi-tenant obrigatório
   instanceId: string      // Z-API instance do tenant
   phone: string           // número do lead (formato: 5521999999999)

@@ -36,6 +36,62 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-09] — Reativa attempts>1 com idempotência por (job.id, label)
+
+**Fase:** Backlog técnico (hardening)
+**Duração:** ~1h30 (1h impl + 30min identificação e correção do escopo da chave)
+
+### O que foi feito
+
+- Helper genérico `runOnce(jobId, label, fn, ttl?)` em `src/shared/queue/idempotency.ts`. Marca `once:{jobId}:{label}` no Redis com `SET NX EX 86400`. Se a 1ª chamada falha, libera a flag para que o próximo retry possa de fato executar.
+- Especialização `sendTextOnce(zapi, jobId, label, payload)` em `whatsapp.service.ts` cobre todos os envios do worker.
+- Todos os `zapi.sendText` do `whatsapp.worker.ts` agora passam por `sendTextOnce` com label distinto: `ai_response`, `out_of_hours`, `handoff_resume`, `handoff_response`, `sentiment_wait_urgent`, `sentiment_wait_haiku`, `corretor_alert_urgent`, `corretor_alert_haiku`.
+- `scoreUp` (único side-effect INCREMENT do banco) envolto em `runOnce(jobId, 'score_up', ...)`. Outros side-effects do banco (saveConversationMessages com UNIQUE, updateLeadStatus, updateConversationSentiment, persistAiFailure) já são naturalmente idempotentes.
+- `whatsappQueue` em `queues.ts` volta a `attempts: 3` com `backoff: { type: 'exponential', delay: 30_000 }` (30s → 1m → 2m).
+- `processWhatsAppJob(job, queue)` recebe o `Job<>` do BullMQ (não só `job.data`) e usa `job.id` como chave de `runOnce`. Discriminação debounce vs handoff-check via `job.name === 'handoff-check'`. Campo `jobId` removido do `WhatsAppMessageJob` (era redundante e era a fonte do bug — ver decisões abaixo).
+
+### Arquivos criados ou modificados
+- `src/shared/queue/idempotency.ts` (novo) — `markOnce`, `clearOnce`, `runOnce`
+- `src/shared/queue/queue.types.ts` — campo `jobId` removido do `WhatsAppMessageJob`
+- `src/modules/whatsapp/whatsapp.service.ts` — `sendTextOnce`; `enqueueMessage` deixa de preencher `jobId`
+- `src/modules/whatsapp/whatsapp.worker.ts` — `processWhatsAppJob` recebe `Job<>`, usa `job.id`/`job.name`, todos os 6 `sendTextOnce` e `runOnce(...,'score_up')` passam `job.id`
+- `src/shared/queue/queues.ts` — `attempts: 3` + backoff exponencial
+- `src/tests/idempotency.test.ts` (novo) — 10 testes (markOnce, clearOnce, runOnce: claim, skip, libera em erro, propaga erro original, isola por jobId)
+- `src/tests/whatsapp.service.test.ts` — 4 testes novos (sendTextOnce: envia, pula, libera, isola por label)
+- `PLAN.md` — item marcado como concluído
+
+### Decisões tomadas
+- **Chave do `runOnce` é o `job.id` do BullMQ, não um string nosso derivado de tenant+phone**: a 1ª implementação keyava em `data.jobId = "debounce:${tenantId}:${phone}"`, constante por lead. Com TTL de 24h, a 2ª conversa do mesmo lead no mesmo dia teria `sendText`/`scoreUp` pulados (lead nunca recebia resposta). Corrigido para usar `job.id` — auto-gerado pelo BullMQ, único por job, estável em retries do mesmo job (stalled detection), distinto entre debounce batches sucessivos. Teste de regressão explícito em `idempotency.test.ts`.
+- **Flag por (job.id, label) e não por job.id só**: cada tipo de mensagem do worker tem label distinto. Permite que envios independentes na mesma rodada (ex.: alerta ao corretor + espera ao lead) não compartilhem flag.
+- **Liberar a flag em erro**: sem isso, falhas no 1º envio fariam retries pularem o `sendText` permanentemente. O DEL no `runOnce` garante que o próximo attempt rode de verdade.
+- **TTL de 24h**: cobre janelas folgadas de retry com backoff exponencial. Limpa naturalmente do Redis depois.
+
+### Validação
+- 132 testes passando (eram 118)
+- `tsc --noEmit` limpo
+
+---
+
+## [2026-05-09] — Cap defensivo no history da IA
+
+**Fase:** Backlog técnico (hardening)
+**Duração:** ~15min
+
+### O que foi feito
+- `MAX_HISTORY_MESSAGES = 30` em `ai-engine.service.ts`. `generateResponse` aplica `history.slice(-30)` antes de montar `apiMessages`. A fronteira de confiança fica na função de IA, não no caller.
+- A RPC `get_conversation_history` já capa em 20 por padrão, mas o cap aqui cobre: caller passar limite maior, RPC mudar de comportamento, ou caso de teste sem o LIMIT do banco.
+
+### Arquivos modificados
+- `src/modules/ai-engine/ai-engine.service.ts` — constante + slice
+- `src/tests/ai-engine.service.test.ts` — 2 testes novos (trim em 100 msgs, preserva em 5 msgs)
+- `PLAN.md` — item marcado como concluído
+
+### Validação
+- 118 testes passando (eram 116) na conclusão deste item; total subiu para 132 após "Reativa attempts>1"
+- `tsc --noEmit` limpo
+
+---
+
 ## [2026-05-09] — Pendências do Sprint 6 fechadas
 
 **Fase:** Fase 2 — Painel web + relatórios

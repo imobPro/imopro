@@ -200,4 +200,13 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-05-09] — Chave de runOnce derivada de tenant+phone colide entre conversas
+
+**Contexto:** whatsapp.worker.ts — primeira implementação do `runOnce` para reativar `attempts > 1` keyava em `data.jobId`, que era setado em `enqueueMessage` como `"debounce:${tenantId}:${phone}"`. Constante por lead. TTL de 24h no Redis.
+**O que estava errado:** A flag `once:debounce:tenant:phone:sendText:ai_response` era reusada entre todas as conversas do mesmo lead em 24h. Após a 1ª resposta, `sendTextOnce`/`scoreUp`/`handoff_resume` da 2ª conversa em diante eram pulados silenciosamente — lead nunca mais recebia resposta da IA naquele dia. Os testes não pegaram porque mockavam Redis com jobIds inventados, sem cenário multi-batch com jobId constante.
+**O que foi corrigido:** `processWhatsAppJob(job, queue)` agora recebe o `Job<>` do BullMQ e usa `job.id` (auto-gerado, único por job, estável em retries do mesmo job) como chave do `runOnce`. Discriminação debounce vs handoff-check via `job.name === 'handoff-check'`. Campo `jobId` removido do `WhatsAppMessageJob` por ser redundante e enganoso. Teste de regressão explícito: dois `jobIds` diferentes com mesma label não compartilham flag.
+**Regra para não repetir:** Chave de idempotência tem que ter o **escopo da unidade de execução** que se quer dedupar. Para retry de UM job (stalled detection), o escopo é o `job.id` interno do BullMQ — único por job, estável em retries do mesmo, distinto entre jobs sucessivos. Nunca derivar a chave de identidade do **domínio** (tenant+phone, leadId, conversationId) quando o que se quer é deduplicar **execuções de um mesmo job**. Se a chave é constante entre execuções logicamente independentes, a flag vai bloquear cenários legítimos. Validar escrevendo um teste que prova explicitamente: "duas execuções com mesmo escopo de domínio mas IDs de execução distintos NÃO compartilham flag."
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->
