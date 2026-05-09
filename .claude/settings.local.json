@@ -7,7 +7,19 @@
       "Bash(git diff:*)",
       "Bash(git log:*)",
       "Bash(npm init:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm test *)",
+      "Bash(awk -F= '{print $1 \"= [\" length\\($2\\) \" chars]\"}')",
+      "mcp__context7__resolve-library-id",
+      "Bash(git *)",
+      "mcp__context7__query-docs",
+      "Bash(npm uninstall *)",
+      "Bash(tasklist *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(/c/Program Files/Git/cmd/git.exe status *)",
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" add .gitignore .claude/settings.local.json)",
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" commit -m \"Atualiza permissoes do Claude Code e ignora lock files internos\")"
     ]
   }
 }

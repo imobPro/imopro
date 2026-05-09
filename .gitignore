@@ -60,3 +60,6 @@ reports/output/
 # ─── Uploads temporários ─────────────────────────────────────────────────────
 uploads/
 tmp/
+
+# ─── Claude Code (estado interno do agente, não versionar) ───────────────────
+.claude/*.lock
