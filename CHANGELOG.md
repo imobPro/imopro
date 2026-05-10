@@ -36,6 +36,74 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-10] — Sprint 9.1 — Schema + billing + gate de trial no worker
+
+**Fase:** Fase 3 — Onboarding self-service (sub-sprint 1 de 3)
+**Duração:** ~2h
+
+### O que foi feito
+
+- **Migration 011** (`subscriptions` + provisionamento Z-API):
+  - Novas colunas em `tenants`: `zapi_account_managed`, `zapi_instance_id`, `zapi_instance_token`, `zapi_status` (not_provisioned|awaiting_qr|connected|disconnected), `zapi_connected_at`, `lgpd_accepted_at`
+  - Tabela `subscriptions` (1:1 com tenant) com lifecycle `trial → expired → active → canceled`, `trial_ends_at`, `trial_message_count`, `plan_id`
+  - RPC `increment_trial_message_count(tenant_id)` — atomic increment via SECURITY DEFINER; retorna NULL quando subscription não está em trial
+  - Trigger `AFTER INSERT ON tenants` cria subscription automaticamente com 7d de trial
+  - Backfill: tenants existentes ganham subscription `active` com `plan_id='legacy'`
+  - RLS via `auth_tenant_ids()` (helper da migration 006)
+- **SDK Z-API** (`src/shared/zapi/client.ts`): `createInstance`, `getInstanceStatus`, `getQrCodeImage`, `disconnectInstance`. Erros tipados via `ZapiError` (status + endpoint). Lazy validation do `ZAPI_ACCOUNT_TOKEN` (lição 005).
+- **Módulo billing** (`src/modules/billing/`):
+  - `billing.service.ts` — `getSubscription`, `isTrialActive`, `isAccessAllowed`, `incrementTrialMessageCount` (via RPC), `expireTrial`, `expireTrialsByTime`, `markActive` (stub do gateway), `toSubscriptionView`
+  - `billing.controller.ts` — `GET /api/subscription` (view enriquecida com `trialMessagesRemaining`, `trialDaysRemaining`, `accessAllowed`), `POST /api/subscription/activate` (stub que apenas grava `plan_id` e marca active)
+  - Cron diário `expire-trials` em fila `billing-cron` (UTC 05:00 = BRT 02:00)
+- **Gate de trial no worker** (`whatsapp.worker.ts`):
+  - Após carregar settings, carrega subscription em paralelo (`Promise.all`)
+  - Se `!isAccessAllowed(subscription)`: cai em `silenceAndSave` (helper extraído do bloco `agentActive=false`, agora reusado por ambos)
+  - Após cada `generateResponse` bem-sucedida (handoff E fluxo principal): `recordAiResponseForBilling(subscription, tenantId)` — incrementa contador via RPC; se atingir cap, marca expired (sem cortar a resposta atual)
+- **`.env.example`** atualizado: novas vars `ZAPI_ACCOUNT_TOKEN`, `TRIAL_DAYS=7`, `TRIAL_MESSAGE_LIMIT=50`. Removidas `AGENT_NAME`/`REALTY_NAME` (no banco desde Sprint 8).
+
+### Arquivos criados ou modificados
+
+- `migrations/011_subscriptions_and_zapi_provisioning.sql` (novo)
+- `src/shared/zapi/client.ts` (novo) — SDK
+- `src/shared/zapi/zapi.types.ts` (novo) — tipos
+- `src/modules/billing/billing.types.ts` (novo)
+- `src/modules/billing/billing.service.ts` (novo)
+- `src/modules/billing/billing.controller.ts` (novo)
+- `src/modules/billing/billing.routes.ts` (novo)
+- `src/modules/billing/billing.cron.ts` (novo)
+- `src/modules/billing/index.ts` (novo)
+- `src/shared/queue/queues.ts` — adiciona `billingQueue` + `BillingJobName`/`BillingJobData`
+- `src/modules/whatsapp/whatsapp.worker.ts` — extrai `silenceAndSave`, adiciona gate de trial e `recordAiResponseForBilling`
+- `src/index.ts` — registra `/api/subscription` + `startBillingWorker` + `registerBillingSchedules`
+- `.env.example` — vars novas, remoção das obsoletas
+- `src/tests/zapi.client.test.ts` (novo) — 9 testes
+- `src/tests/billing.service.test.ts` (novo) — 31 testes
+- `src/tests/whatsapp.worker.trial.test.ts` (novo) — 8 testes
+
+### Decisões tomadas (entrevista 2026-05-10)
+
+- **Cobrança stubada** no MVP da Fase 3 — gateway Stripe/Asaas vira sub-sprint separado quando MEI ativar. `markActive` apenas grava `plan_id` por enquanto.
+- **Bifurcação shared/individual** no início do cadastro (Sprint 9.2 implementa).
+- **ImobPro provisiona Z-API automaticamente** via Partner API com `ZAPI_ACCOUNT_TOKEN`.
+- **Trial 7 dias OU 50 mensagens** (o que vier primeiro) — cap configurável via env.
+- **Pós-trial: IA desliga, painel acessível** — reusa `saveIncomingMessagesOnly`. Pattern unificado entre `agentActive=false` e trial expirado via helper `silenceAndSave`.
+- **Plano único no MVP** — `plan_id` é text simples; tela de planos com 1 card.
+- **E-mail confirmado antes de provisionar Z-API** — gate da rota `provision-zapi` no Sprint 9.2.
+
+### Testes
+
+180 totais passando (132 → 180, +48 do Sprint 9.1).
+
+### Pendências para próxima sessão (Sprint 9.2)
+
+- [ ] Módulo `onboarding` (signup, criação de tenant+agent+subscription em transação)
+- [ ] Endpoint `POST /api/signup` público
+- [ ] Endpoint `POST /api/onboarding/provision-zapi` (autenticado, requer email confirmado)
+- [ ] Webhook `POST /webhook/zapi-status` (atualiza `tenants.zapi_status` quando instância conecta)
+- [ ] Aceite explícito LGPD durante o cadastro (timestamp em `lgpd_accepted_at`)
+
+---
+
 ## [2026-05-09] — Reativa attempts>1 com idempotência por (job.id, label)
 
 **Fase:** Backlog técnico (hardening)

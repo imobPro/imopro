@@ -14,6 +14,11 @@ import {
   startReportsWorker,
 } from './modules/reports'
 import { tenantSettingsRouter } from './modules/tenant-settings'
+import {
+  billingRouter,
+  registerBillingSchedules,
+  startBillingWorker,
+} from './modules/billing'
 import { requireAuth } from './shared/middleware/auth'
 import { errorHandler } from './shared/errors/error-handler'
 
@@ -41,6 +46,7 @@ app.use('/webhook', webhookLimiter, whatsappRouter)
 app.use('/api', apiLimiter, requireAuth, authRouter)
 app.use('/api/reports', apiLimiter, requireAuth, reportsRouter)
 app.use('/api/settings', apiLimiter, requireAuth, tenantSettingsRouter)
+app.use('/api/subscription', apiLimiter, requireAuth, billingRouter)
 
 app.use(errorHandler)
 
@@ -48,11 +54,18 @@ app.listen(PORT, async () => {
   console.log(`ImobPro rodando na porta ${PORT}`)
   startWhatsAppWorker()
   startReportsWorker()
+  startBillingWorker()
   try {
     await registerReportsSchedules()
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     console.error(`[Boot] Falha ao registrar schedules de relatórios: ${msg}`)
+  }
+  try {
+    await registerBillingSchedules()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Boot] Falha ao registrar schedules de billing: ${msg}`)
   }
 })
 

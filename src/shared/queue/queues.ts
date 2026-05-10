@@ -43,3 +43,27 @@ export const reportsQueue = new Queue<ReportsJobData>(REPORTS_QUEUE_NAME, {
     removeOnFail: 200,
   },
 })
+
+// -----------------------------------------------------------------------------
+// Fila de billing (Fase 3) — cron diário de expiração de trials
+// -----------------------------------------------------------------------------
+
+export const BILLING_QUEUE_NAME = 'billing-cron'
+
+export type BillingJobName = 'expire-trials'
+
+export interface BillingJobData {
+  triggeredAt: string
+}
+
+export const billingQueue = new Queue<BillingJobData>(BILLING_QUEUE_NAME, {
+  connection: redisConnection,
+  defaultJobOptions: {
+    // expireTrialsByTime é idempotente (UPDATE WHERE status='trial' AND ends_at < now),
+    // retry seguro
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 60_000 },
+    removeOnComplete: 50,
+    removeOnFail: 200,
+  },
+})

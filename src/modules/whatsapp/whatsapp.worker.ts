@@ -15,6 +15,7 @@ import {
 } from './whatsapp.service'
 import { runOnce } from '../../shared/queue/idempotency'
 import { generateResponse } from '../ai-engine'
+import type { PendingMessage } from '../ai-engine/ai-engine.types'
 import {
   upsertLead,
   updateLeadStatus,
@@ -30,6 +31,14 @@ import {
 import { analyzeSentiment } from '../sentiment'
 import { getHandoffTargetPhone } from '../agents'
 import { getTenantSettings, type TenantSettings } from '../tenant-settings'
+import {
+  getSubscription,
+  isAccessAllowed,
+  incrementTrialMessageCount,
+  expireTrial,
+  getTrialMessageLimit,
+  type Subscription,
+} from '../billing'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
@@ -80,6 +89,59 @@ async function isHandoffActive(tenantId: string, phone: string): Promise<boolean
 
 async function clearHandoff(tenantId: string, phone: string): Promise<void> {
   await redisConnection.del(`handoff_active:${tenantId}:${phone}`)
+}
+
+/**
+ * Salva as mensagens recebidas como "lidas pelo corretor" sem responder com IA.
+ * Reusado pelos modos silêncio: toggle desligado E trial expirado/canceled.
+ */
+async function silenceAndSave(
+  data: WhatsAppMessageJob,
+  pendingMessages: PendingMessage[],
+  reasonLabel: string,
+): Promise<void> {
+  const { tenantId, phone } = data
+  let lead
+  try {
+    const detected = [...pendingMessages].reverse().find((m) => m.text)?.text ?? null
+    lead = await upsertLead({ tenantId, phone, profile: detected ? detectLeadProfile(detected) : null })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Worker] ${reasonLabel}: upsertLead falhou | ${msg}`)
+    return
+  }
+  const incoming: IncomingMessage[] = pendingMessages
+    .filter((m) => m.text || m.mediaUrl)
+    .map((m) => ({
+      zapiMessageId: `${data.messageId}-${m.timestamp}`,
+      content: m.text ?? '',
+      type: m.type,
+      mediaUrl: m.mediaUrl,
+    }))
+  await saveIncomingMessagesOnly({ tenantId, leadId: lead.id, incomingMessages: incoming }).catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Worker] ${reasonLabel}: saveIncomingMessagesOnly falhou | ${msg}`)
+  })
+}
+
+/**
+ * Após uma resposta da IA bem-sucedida, contabiliza para o cap do trial e
+ * marca expired se atingiu o limite. NO-OP quando subscription não está em
+ * trial (active/expired/canceled). Best-effort: falha não derruba a resposta.
+ *
+ * Exportado para teste — a chamada real vive dentro de processWhatsAppJob.
+ */
+export async function recordAiResponseForBilling(
+  subscription: Subscription | null,
+  tenantId: string,
+): Promise<void> {
+  if (!subscription || subscription.status !== 'trial') return
+  const newCount = await incrementTrialMessageCount(tenantId)
+  if (newCount === null) return
+  if (newCount >= getTrialMessageLimit()) {
+    console.log(`[Worker] Trial atingiu cap | tenant=${tenantId} count=${newCount} — marcando expired`)
+    await expireTrial(tenantId)
+  }
 }
 
 async function alertCorretor(
@@ -159,38 +221,30 @@ export async function processWhatsAppJob(
     return
   }
 
-  // 2. Carregar configurações do tenant (Sprint 8). Falha → defaults seguros
-  // dentro de getTenantSettings; o atendimento não deve cair por config.
-  const settings = await getTenantSettings(tenantId)
+  // 2. Carregar configurações do tenant (Sprint 8) e subscription (Fase 3).
+  // Ambas falham em defaults seguros — atendimento não deve cair por config.
+  const [settings, subscription] = await Promise.all([
+    getTenantSettings(tenantId),
+    getSubscription(tenantId),
+  ])
   const schedule = buildScheduleFromTenant(settings.businessHoursStart, settings.businessHoursEnd)
   const withinHours = isWithinBusinessHours(schedule)
   const instanceToken = process.env.ZAPI_TOKEN
   const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
 
-  // 2a. Toggle do agente desligado: salva mensagem do lead, não responde
+  // 2a. Trial expirado/canceled: IA fica em silêncio, mensagem salva no painel.
+  // Mesmo padrão do toggle agentActive=false. subscription=null (caso
+  // teoricamente impossível pelo trigger) é permissivo — não bloqueia atendimento.
+  if (subscription && !isAccessAllowed(subscription)) {
+    console.log(`[Worker] Acesso bloqueado | tenant=${tenantId} status=${subscription.status} phone=${phone} — IA em silêncio`)
+    await silenceAndSave(data, pendingMessages, `subscription=${subscription.status}`)
+    return
+  }
+
+  // 2b. Toggle do agente desligado: salva mensagem do lead, não responde
   if (!settings.agentActive) {
     console.log(`[Worker] Agente desligado | tenant=${tenantId} phone=${phone} — IA em silêncio`)
-    let lead
-    try {
-      const detected = [...pendingMessages].reverse().find((m) => m.text)?.text ?? null
-      lead = await upsertLead({ tenantId, phone, profile: detected ? detectLeadProfile(detected) : null })
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[Worker] agentActive=false: upsertLead falhou | ${msg}`)
-      return
-    }
-    const incoming: IncomingMessage[] = pendingMessages
-      .filter((m) => m.text || m.mediaUrl)
-      .map((m) => ({
-        zapiMessageId: `${data.messageId}-${m.timestamp}`,
-        content: m.text ?? '',
-        type: m.type,
-        mediaUrl: m.mediaUrl,
-      }))
-    await saveIncomingMessagesOnly({ tenantId, leadId: lead.id, incomingMessages: incoming }).catch((err) => {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[Worker] agentActive=false: saveIncomingMessagesOnly falhou | ${msg}`)
-    })
+    await silenceAndSave(data, pendingMessages, 'agentActive=false')
     return
   }
 
@@ -266,6 +320,8 @@ export async function processWhatsAppJob(
     } else {
       console.log(`[Worker] [DEV] Resposta IA (handoff) | phone=${phone}\n${aiResponse.text}`)
     }
+
+    await recordAiResponseForBilling(subscription, tenantId)
 
     try {
       const incomingMessages: IncomingMessage[] = pendingMessages
@@ -387,6 +443,9 @@ export async function processWhatsAppJob(
   } else {
     console.log(`[Worker] [DEV] Resposta IA | phone=${phone}\n${aiResponse.text}`)
   }
+
+  // 8b. Contabiliza a resposta para o cap do trial (no-op se status != trial)
+  await recordAiResponseForBilling(subscription, tenantId)
 
   // 9. Verificar se a IA sinalizou transferência
   if (aiResponse.shouldTransfer) {
