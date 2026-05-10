@@ -19,7 +19,6 @@ Dono do projeto: Arthur CG — Niterói, Rio de Janeiro, Brasil.
 | Camada | Tecnologia | Observação |
 |---|---|---|
 | Mensagens | Z-API | Uma instância por cliente (tenant) |
-| Orquestração | N8N Cloud | Automações secundárias e webhooks |
 | IA | Claude API — Sonnet por padrão | Ver seção de modelos abaixo |
 | Banco | Supabase (PostgreSQL + RLS) | Multi-tenant obrigatório |
 | Backend | Node.js + Express | Lógica central e API |
