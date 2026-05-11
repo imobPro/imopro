@@ -49,7 +49,8 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - Modo imobiliária não exige cadastrar corretores no onboarding — quem assina vira o 1º corretor; `phone` opcional
 
 ### O que foi feito
-- **Migration 011 ajustada** (ainda não aplicada): `subscriptions.trial_started_at`/`trial_ends_at` agora **nullable** (NULL = trial não começou); trigger `create_default_subscription()` cria só `(tenant_id, status='trial')`, sem datas — o relógio só inicia na conexão do WhatsApp.
+- **Migration 011 ajustada**: `subscriptions.trial_started_at`/`trial_ends_at` agora **nullable** (NULL = trial não começou); trigger `create_default_subscription()` cria só `(tenant_id, status='trial')`, sem datas — o relógio só inicia na conexão do WhatsApp. Arthur aplicou a 011 no Supabase em 2026-05-11.
+- **Migration 012** (`012_trial_clock_fixup.sql`, nova) — fix-up idempotente: garante as colunas nullable (a 011 usa `CREATE TABLE IF NOT EXISTS`, então quem rodou uma versão anterior ficou com NOT NULL) + trigger sem datas. No-op se a 011 atual já foi aplicada. **Rodar no Supabase por segurança.**
 - **`billing.service.ts`**: `Subscription.trialStartedAt`/`trialEndsAt` agora `string | null`; `isTrialActive` trata data nula como "trial pendente" (ativo se abaixo do cap); novo `startTrialClock(tenantId)` (UPDATE condicional idempotente — guarda `trial_started_at IS NULL`); novo `getTrialDays()`; `toSubscriptionView` ganha `trialStarted` e reporta o período cheio em `trialDaysRemaining` quando ainda não começou.
 - **Módulo `onboarding`** (`src/modules/onboarding/`):
   - `POST /api/onboarding/signup` (público, limiter 10/h por IP): cria `auth.users` (não confirmado, admin API) → tenant (o trigger cria a subscription `trial` sem datas) → agent (a própria pessoa, destino de handoff, `phone` opcional), grava `lgpd_accepted_at`. E-mail duplicado → 409 `EMAIL_IN_USE`. Rollback compensatório (deleta user/tenant) se um passo seguinte falha.
@@ -70,7 +71,8 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 - `migrations/README.md`, `PLAN.md`, `docs/checklist-producao.md` — docs
 
 ### Pendências para próxima sessão
-- [ ] **Pré-deploy**: rodar `migrations/011_subscriptions_and_zapi_provisioning.sql` no SQL Editor do Supabase (ainda não aplicada).
+- [x] ~~Rodar `migrations/011_...sql` no Supabase~~ — feito por Arthur em 2026-05-11.
+- [ ] **Pré-deploy**: rodar `migrations/012_trial_clock_fixup.sql` no Supabase (idempotente — garante o estado final da 011 caso uma versão anterior tenha sido aplicada).
 - [ ] **Pré-deploy**: configurar `BACKEND_PUBLIC_URL` no Railway.
 - [ ] **Pré-deploy**: conferir o setting "Confirm email" no Supabase Auth — o cadastro nasce com e-mail não confirmado; "logar antes de confirmar" depende dessa config.
 - [ ] **Pré-deploy multi-instância**: instâncias provisionadas via Partner API não recebem o `ZAPI_CLIENT_TOKEN` compartilhado — `/webhook/whatsapp` (que valida esse token) só funciona para o piloto manual hoje. Configurar client-token por instância via API da Z-API ou migrar pra token por instância antes do 1º cliente self-service.

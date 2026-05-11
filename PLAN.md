@@ -160,7 +160,8 @@ Decisões da entrevista (2026-05-11, Sprint 9.2): o relógio dos 7 dias do trial
 - ✅ 2026-05-11 Webhook `POST /webhook/zapi-status` (atualiza `tenants.zapi_status`; na conexão dispara `billing.startTrialClock` — relógio do trial começa aqui)
 - ✅ 2026-05-11 Aceite explícito LGPD persistido em `tenants.lgpd_accepted_at` (checkbox obrigatório no cadastro)
 - ✅ 2026-05-11 Migration 011 ajustada (datas do trial nullable, trigger sem datas) + `billing.startTrialClock`/`getTrialDays`/`trialStarted`. 213 testes passando.
-- 🔁 Pré-deploy: rodar migration 011 no Supabase; configurar `BACKEND_PUBLIC_URL`; conferir "Confirm email" no Supabase Auth; resolver client-token por instância para o `/webhook/whatsapp` das instâncias provisionadas (ver `docs/checklist-producao.md`)
+- ✅ 2026-05-11 Migration 011 aplicada no Supabase por Arthur. Criada a migration 012 (`012_trial_clock_fixup.sql`) — fix-up idempotente das datas do trial, **rodar no Supabase por segurança**.
+- 🔁 Pré-deploy restante: configurar `BACKEND_PUBLIC_URL`; conferir "Confirm email" no Supabase Auth; resolver client-token por instância para o `/webhook/whatsapp` das instâncias provisionadas (ver `docs/checklist-producao.md`)
 
 ### Sprint 9.3 — Frontend público + interno
 - [ ] `/precos` — landing pública com plano único + CTA de trial
