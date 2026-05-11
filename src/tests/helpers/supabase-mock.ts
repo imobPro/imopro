@@ -11,11 +11,15 @@ type FromMock = ReturnType<typeof vi.fn>
  * `result` ao chamar `maybeSingle/single` ou ao ser awaited diretamente
  * (PostgREST com `head:true` deixa a chain awaitable).
  *
- * `captureUpdate` permite inspecionar o payload do `.update()` no teste.
+ * `captureWrite` permite inspecionar o payload de `.update()` / `.insert()`.
  */
-export function chain(result: QueryResult, captureUpdate?: CaptureFn) {
+export function chain(result: QueryResult, captureWrite?: CaptureFn) {
   const self: Record<string, unknown> = {}
   const passthrough = () => self
+  const writeAndReturn = (payload: unknown) => {
+    captureWrite?.(payload)
+    return self
+  }
   Object.assign(self, {
     select: passthrough,
     eq: passthrough,
@@ -25,10 +29,9 @@ export function chain(result: QueryResult, captureUpdate?: CaptureFn) {
     is: passthrough,
     order: passthrough,
     limit: passthrough,
-    update: (payload: unknown) => {
-      captureUpdate?.(payload)
-      return self
-    },
+    update: writeAndReturn,
+    insert: writeAndReturn,
+    delete: passthrough,
     maybeSingle: () => Promise.resolve(result),
     single: () => Promise.resolve(result),
     then: (onFulfilled: (v: QueryResult) => unknown) =>

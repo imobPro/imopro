@@ -1,9 +1,11 @@
 export {
   getSubscription,
   getTrialMessageLimit,
+  getTrialDays,
   isTrialActive,
   isAccessAllowed,
   incrementTrialMessageCount,
+  startTrialClock,
   expireTrial,
   expireTrialsByTime,
   markActive,

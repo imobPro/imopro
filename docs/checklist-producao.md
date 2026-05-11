@@ -4,10 +4,11 @@ Tudo que precisa estar **pago, contratado ou configurado** para rodar o ImobPro
 com cliente real, organizado por urgência. Atualize toda vez que mudar de plano,
 contratar serviço ou descobrir um novo limite de free tier.
 
-> **Status atual (2026-05-10):** desenvolvimento local. Nenhum cliente piloto.
+> **Status atual (2026-05-11):** desenvolvimento local. Nenhum cliente piloto.
 > Tudo rodando em free tier. Resend ainda **não testado** (depende de domínio).
 > LGPD documental: rascunho criado em `docs/privacidade.md` e `docs/termos.md`
 > — precisa de revisão de advogado antes da operação em escala.
+> Sprint 9.2 (onboarding backend) entregue — ver itens novos na seção 🟢 Fase 3.
 
 ---
 
@@ -63,6 +64,12 @@ Necessário quando o ImobPro vira produto que cliente assina sozinho.
 
 | Item | Notas |
 |---|---|
+| **Rodar migration 011 no Supabase** | `migrations/011_subscriptions_and_zapi_provisioning.sql` — ainda **não aplicada**. Sem ela o onboarding e o gate de trial não funcionam. SQL Editor → colar → Run. |
+| **`BACKEND_PUBLIC_URL` no Railway** | URL pública do backend (ex.: `https://imobpro.up.railway.app`). A Z-API posta nela as callbacks das instâncias provisionadas (`/webhook/whatsapp` e `/webhook/zapi-status`). Sem ela, `POST /api/onboarding/provision-zapi` responde 500. |
+| **Setting "Confirm email" no Supabase Auth** | O cadastro cria o usuário com e-mail **não confirmado** (o provisionamento Z-API exige confirmação). A experiência "logar e ver o painel antes de confirmar" pressupõe que o login não seja bloqueado por e-mail não confirmado — conferir Authentication → Providers → Email. O e-mail de confirmação em si usa o sender embutido do Supabase (rate-limited) até existir domínio + Resend. |
+| **Client-token por instância (Z-API)** | As instâncias provisionadas via Partner API **não** recebem o `ZAPI_CLIENT_TOKEN` compartilhado por padrão — o `/webhook/whatsapp`, que valida esse token, só funciona para o piloto manual. Antes do 1º cliente self-service: configurar o client-token de cada instância criada (precisa de uma chamada nova na API da Z-API) ou migrar `/webhook/whatsapp` para validar token por instância. (`/webhook/zapi-status` já roda sem token — `instanceId` atua como segredo.) |
+| **Verificar payload das callbacks de status da Z-API** | `handleZapiStatusEvent` (`src/modules/onboarding`) assume `type` / `connected` no body de "On Connected" / "On Disconnected". Conferir contra a doc da Z-API antes do deploy (lição: não assumir shape de API de terceiro). |
+| **Caps de spending revisados para tráfego self-service** | Com onboarding aberto, o número de tenants pode crescer rápido — reavaliar os tetos da Anthropic/OpenAI antes de divulgar o cadastro. |
 | **Stripe BR** ou **Asaas** | Pra cobrança recorrente automática. Stripe pede CNPJ no Brasil. Asaas é nacional, integra Pix/boleto. Custo: ~3,5% por transação (ambos). |
 | **CNPJ** | Pré-requisito pra Stripe e pra emitir nota fiscal. **MEI é gratuito** e atende ao piloto (limite R$ 81k/ano). Migrar para LTDA quando o ARR justificar. |
 | **Conta jurídica** | Caixa, BB ou banco digital (Inter/Stone). Necessária para receber via gateway. |

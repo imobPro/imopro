@@ -8,6 +8,7 @@ import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import { whatsappRouter, startWhatsAppWorker } from './modules/whatsapp'
 import { authRouter } from './modules/auth'
+import { onboardingRouter, onboardingWebhookRouter } from './modules/onboarding'
 import {
   reportsRouter,
   registerReportsSchedules,
@@ -42,7 +43,12 @@ app.get('/health', (_req, res) => {
 })
 
 app.use('/webhook', webhookLimiter, whatsappRouter)
+app.use('/webhook', webhookLimiter, onboardingWebhookRouter)
 
+// /api/onboarding tem rota pública (/signup) — montado ANTES do bloco /api que
+// aplica requireAuth a tudo. As rotas autenticadas do onboarding usam requireAuth
+// por rota; /signup tem seu próprio limiter mais apertado dentro do router.
+app.use('/api/onboarding', apiLimiter, onboardingRouter)
 app.use('/api', apiLimiter, requireAuth, authRouter)
 app.use('/api/reports', apiLimiter, requireAuth, reportsRouter)
 app.use('/api/settings', apiLimiter, requireAuth, tenantSettingsRouter)

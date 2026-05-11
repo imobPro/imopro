@@ -10,7 +10,9 @@ import {
   isTrialActive,
   isAccessAllowed,
   getTrialMessageLimit,
+  getTrialDays,
   incrementTrialMessageCount,
+  startTrialClock,
   expireTrial,
   expireTrialsByTime,
   markActive,
@@ -24,16 +26,20 @@ const fromMock = supabase.from as ReturnType<typeof vi.fn>
 const rpcMock = supabase.rpc as ReturnType<typeof vi.fn>
 
 const ORIGINAL_TRIAL_LIMIT = process.env.TRIAL_MESSAGE_LIMIT
+const ORIGINAL_TRIAL_DAYS = process.env.TRIAL_DAYS
 
 beforeEach(() => {
   fromMock.mockReset()
   rpcMock.mockReset()
   process.env.TRIAL_MESSAGE_LIMIT = '50'
+  process.env.TRIAL_DAYS = '7'
 })
 
 afterEach(() => {
   if (ORIGINAL_TRIAL_LIMIT === undefined) delete process.env.TRIAL_MESSAGE_LIMIT
   else process.env.TRIAL_MESSAGE_LIMIT = ORIGINAL_TRIAL_LIMIT
+  if (ORIGINAL_TRIAL_DAYS === undefined) delete process.env.TRIAL_DAYS
+  else process.env.TRIAL_DAYS = ORIGINAL_TRIAL_DAYS
 })
 
 const trialSub: Subscription = {
@@ -72,6 +78,22 @@ describe('getTrialMessageLimit', () => {
   })
 })
 
+describe('getTrialDays', () => {
+  it('lê do env quando válido', () => {
+    process.env.TRIAL_DAYS = '14'
+    expect(getTrialDays()).toBe(14)
+  })
+
+  it('cai no default 7 quando env ausente ou inválido', () => {
+    delete process.env.TRIAL_DAYS
+    expect(getTrialDays()).toBe(7)
+    process.env.TRIAL_DAYS = 'abc'
+    expect(getTrialDays()).toBe(7)
+    process.env.TRIAL_DAYS = '0'
+    expect(getTrialDays()).toBe(7)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // isTrialActive
 // ---------------------------------------------------------------------------
@@ -100,6 +122,16 @@ describe('isTrialActive', () => {
     expect(isTrialActive({ ...trialSub, status: 'active' })).toBe(false)
     expect(isTrialActive({ ...trialSub, status: 'expired' })).toBe(false)
     expect(isTrialActive({ ...trialSub, status: 'canceled' })).toBe(false)
+  })
+
+  it('true quando o relógio ainda não começou (datas null) e abaixo do cap', () => {
+    expect(isTrialActive({ ...trialSub, trialStartedAt: null, trialEndsAt: null })).toBe(true)
+  })
+
+  it('false quando o relógio não começou mas o cap de mensagens já foi atingido', () => {
+    expect(
+      isTrialActive({ ...trialSub, trialStartedAt: null, trialEndsAt: null, trialMessageCount: 50 }),
+    ).toBe(false)
   })
 })
 
@@ -209,6 +241,46 @@ describe('incrementTrialMessageCount', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     rpcMock.mockResolvedValueOnce({ data: null, error: { message: 'rpc fail' } })
     expect(await incrementTrialMessageCount('tenant-1')).toBeNull()
+    spy.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// startTrialClock
+// ---------------------------------------------------------------------------
+
+describe('startTrialClock', () => {
+  it('grava trial_started_at = now e trial_ends_at = now + TRIAL_DAYS', async () => {
+    process.env.TRIAL_DAYS = '7'
+    let payload: Record<string, string> | undefined
+    queueFromResponses(fromMock, [{ data: null, error: null }], [(p) => (payload = p as Record<string, string>)])
+
+    await startTrialClock('tenant-1')
+
+    expect(typeof payload?.trial_started_at).toBe('string')
+    expect(typeof payload?.trial_ends_at).toBe('string')
+    const started = new Date(payload!.trial_started_at).getTime()
+    const ends = new Date(payload!.trial_ends_at).getTime()
+    expect(ends - started).toBe(7 * 24 * 60 * 60 * 1000)
+  })
+
+  it('respeita TRIAL_DAYS customizado', async () => {
+    process.env.TRIAL_DAYS = '14'
+    let payload: Record<string, string> | undefined
+    queueFromResponses(fromMock, [{ data: null, error: null }], [(p) => (payload = p as Record<string, string>)])
+
+    await startTrialClock('tenant-1')
+
+    const started = new Date(payload!.trial_started_at).getTime()
+    const ends = new Date(payload!.trial_ends_at).getTime()
+    expect(ends - started).toBe(14 * 24 * 60 * 60 * 1000)
+  })
+
+  it('não lança quando supabase erra (apenas loga)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    queueFromResponses(fromMock, [{ data: null, error: { message: 'db down' } }])
+    await expect(startTrialClock('tenant-1')).resolves.toBeUndefined()
+    expect(spy).toHaveBeenCalled()
     spy.mockRestore()
   })
 })
@@ -332,5 +404,17 @@ describe('toSubscriptionView', () => {
   it('expressa accessAllowed = true para active', () => {
     const view = toSubscriptionView({ ...trialSub, status: 'active' })
     expect(view.accessAllowed).toBe(true)
+  })
+
+  it('quando o trial ainda não começou: trialStarted false e trialDaysRemaining = TRIAL_DAYS', () => {
+    process.env.TRIAL_DAYS = '7'
+    const view = toSubscriptionView({ ...trialSub, trialStartedAt: null, trialEndsAt: null })
+    expect(view.trialStarted).toBe(false)
+    expect(view.trialDaysRemaining).toBe(7)
+    expect(view.accessAllowed).toBe(true)
+  })
+
+  it('quando o trial já começou: trialStarted true', () => {
+    expect(toSubscriptionView(trialSub).trialStarted).toBe(true)
   })
 })

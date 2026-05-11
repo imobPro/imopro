@@ -16,10 +16,15 @@ const REQUIRED_VARS: string[] = [
 //   de texto quando ausente.
 // RESEND_API_KEY / RESEND_FROM_EMAIL: envio dos relatórios mensais por e-mail.
 //   Cron continua rodando e gerando o PDF; o passo de envio falha com warning.
+// ZAPI_ACCOUNT_TOKEN / BACKEND_PUBLIC_URL: provisionamento de instância Z-API no
+//   onboarding (POST /api/onboarding/provision-zapi). Sem eles a rota responde
+//   500 SERVER_MISCONFIGURED; o restante do sistema (piloto manual) segue normal.
 const OPTIONAL_VARS: string[] = [
   'OPENAI_API_KEY',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
+  'ZAPI_ACCOUNT_TOKEN',
+  'BACKEND_PUBLIC_URL',
 ]
 
 export function validateEnv(): void {

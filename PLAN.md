@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 3 — Onboarding self-service (sub-sprint 9.1 concluído em 2026-05-10)
-**Próximo passo:** Sprint 9.2 — Onboarding backend + provisionamento Z-API
+**Fase:** 3 — Onboarding self-service (sub-sprint 9.2 concluído em 2026-05-11)
+**Próximo passo:** Sprint 9.3 — Frontend público (`/precos`, `/cadastro`, `/privacidade`, `/termos`) + interno (`/conectar-whatsapp` com QR, `/configuracoes/assinatura`, banner de trial)
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -141,9 +141,11 @@ Itens identificados na revisão dos módulos críticos com Context7. Não bloque
 
 ## Fase 3 — Onboarding automatizado
 **Duração estimada:** Mês 7–10
-**Status:** 🔄 Em andamento (sub-sprint 9.1 ✅)
+**Status:** 🔄 Em andamento (sub-sprints 9.1 ✅ e 9.2 ✅)
 
 Decisões da entrevista (2026-05-10): cobrança **stubada** no MVP (gateway real só com MEI ativo), bifurcação shared/individual no cadastro, ImobPro provisiona Z-API via Partner API, trial **7 dias OU 50 mensagens**, pós-trial reusa `saveIncomingMessagesOnly`, plano único no MVP, e-mail confirmado antes de provisionar Z-API.
+
+Decisões da entrevista (2026-05-11, Sprint 9.2): o relógio dos 7 dias do trial **só começa quando o WhatsApp conecta** (não no cadastro); cliente loga e vê o painel antes de confirmar o e-mail (com aviso); falha ao provisionar Z-API → erro limpo + "tentar de novo" no frontend, nada gravado pela metade; WhatsApp que cai depois → marca `disconnected` (banner de reconectar é do 9.3); aceite LGPD = um checkbox obrigatório; modo imobiliária não exige cadastrar corretores no onboarding (quem assina vira o 1º corretor, `phone` opcional).
 
 ### Sprint 9.1 — Schema + billing + gate de trial
 - ✅ 2026-05-10 Migration 011 (`subscriptions` + colunas `zapi_*`/`lgpd_accepted_at` em tenants + RPC + trigger + backfill legacy)
@@ -153,10 +155,12 @@ Decisões da entrevista (2026-05-10): cobrança **stubada** no MVP (gateway real
 - ✅ 2026-05-10 Gate de trial em `whatsapp.worker.ts` (silêncio quando expirado, increment após cada resposta IA, marcação automática de expired ao atingir cap)
 
 ### Sprint 9.2 — Onboarding backend + provisionamento Z-API
-- [ ] Módulo `onboarding`: `POST /api/signup` público (cria auth.users + tenant + agent + subscription em transação)
-- [ ] `POST /api/onboarding/provision-zapi` autenticado (gate `email_confirmed_at`)
-- [ ] Webhook `POST /webhook/zapi-status` (atualiza `tenants.zapi_status` quando instância conecta/desconecta)
-- [ ] Aceite explícito LGPD persistido em `tenants.lgpd_accepted_at`
+- ✅ 2026-05-11 Módulo `onboarding`: `POST /api/onboarding/signup` público (cria auth.users + tenant + agent; o trigger cria a subscription `trial`; rollback compensatório se um passo falha)
+- ✅ 2026-05-11 `POST /api/onboarding/provision-zapi` autenticado (gate `email_confirmed_at`; cria a instância via Partner API; idempotente; `ZapiError` → 502) + `GET /api/onboarding/connection` (polling do QR/status)
+- ✅ 2026-05-11 Webhook `POST /webhook/zapi-status` (atualiza `tenants.zapi_status`; na conexão dispara `billing.startTrialClock` — relógio do trial começa aqui)
+- ✅ 2026-05-11 Aceite explícito LGPD persistido em `tenants.lgpd_accepted_at` (checkbox obrigatório no cadastro)
+- ✅ 2026-05-11 Migration 011 ajustada (datas do trial nullable, trigger sem datas) + `billing.startTrialClock`/`getTrialDays`/`trialStarted`. 213 testes passando.
+- 🔁 Pré-deploy: rodar migration 011 no Supabase; configurar `BACKEND_PUBLIC_URL`; conferir "Confirm email" no Supabase Auth; resolver client-token por instância para o `/webhook/whatsapp` das instâncias provisionadas (ver `docs/checklist-producao.md`)
 
 ### Sprint 9.3 — Frontend público + interno
 - [ ] `/precos` — landing pública com plano único + CTA de trial

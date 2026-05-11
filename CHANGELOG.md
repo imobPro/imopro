@@ -36,6 +36,49 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-11] — Sprint 9.2 — Onboarding backend + provisionamento Z-API
+
+**Fase:** Fase 3 — Onboarding self-service (sub-sprint 2 de 3)
+
+### Entrevista de negócio (decisões)
+- Relógio do trial (7 dias) começa **quando o WhatsApp conecta**, não no cadastro
+- Antes de confirmar o e-mail: cliente loga e vê o painel (com aviso); conectar o WhatsApp fica bloqueado até confirmar
+- Falha ao provisionar instância Z-API: erro limpo + "tentar de novo" (frontend), nada gravado pela metade
+- WhatsApp cai depois: marca `disconnected`; banner de reconectar é do 9.3; sem e-mail por enquanto
+- Aceite LGPD: um checkbox obrigatório no cadastro, grava `lgpd_accepted_at`
+- Modo imobiliária não exige cadastrar corretores no onboarding — quem assina vira o 1º corretor; `phone` opcional
+
+### O que foi feito
+- **Migration 011 ajustada** (ainda não aplicada): `subscriptions.trial_started_at`/`trial_ends_at` agora **nullable** (NULL = trial não começou); trigger `create_default_subscription()` cria só `(tenant_id, status='trial')`, sem datas — o relógio só inicia na conexão do WhatsApp.
+- **`billing.service.ts`**: `Subscription.trialStartedAt`/`trialEndsAt` agora `string | null`; `isTrialActive` trata data nula como "trial pendente" (ativo se abaixo do cap); novo `startTrialClock(tenantId)` (UPDATE condicional idempotente — guarda `trial_started_at IS NULL`); novo `getTrialDays()`; `toSubscriptionView` ganha `trialStarted` e reporta o período cheio em `trialDaysRemaining` quando ainda não começou.
+- **Módulo `onboarding`** (`src/modules/onboarding/`):
+  - `POST /api/onboarding/signup` (público, limiter 10/h por IP): cria `auth.users` (não confirmado, admin API) → tenant (o trigger cria a subscription `trial` sem datas) → agent (a própria pessoa, destino de handoff, `phone` opcional), grava `lgpd_accepted_at`. E-mail duplicado → 409 `EMAIL_IN_USE`. Rollback compensatório (deleta user/tenant) se um passo seguinte falha.
+  - `POST /api/onboarding/provision-zapi` (autenticado): gate `email_confirmed_at` (403 `EMAIL_NOT_CONFIRMED`); cria a instância via Partner API com callbacks pra `BACKEND_PUBLIC_URL` (`/webhook/whatsapp` e `/webhook/zapi-status`); persiste `zapi_instance_id/token` + `zapi_status='awaiting_qr'`; devolve o QR (`null` se a instância ainda subindo). Idempotente: já conectado → `alreadyConnected`; instância existente → reaproveita, só rebusca QR. `ZapiError` → 502 `ZAPI_PROVISIONING_FAILED`, nada persistido.
+  - `GET /api/onboarding/connection` (autenticado): status atual + QR fresco quando `awaiting_qr` — endpoint de polling do frontend.
+  - `POST /webhook/zapi-status` (webhook): localiza o tenant por `zapi_instance_id`; conexão → `zapi_status='connected'` + `zapi_connected_at` + `startTrialClock` (os 7 dias começam aqui); desconexão → `zapi_status='disconnected'`; eventos ambíguos ignorados. Sem `requireZapiToken` (instâncias provisionadas não enviam o token compartilhado por padrão — `instanceId` atua como segredo; TODO: assinatura).
+- **`src/index.ts`**: monta `onboardingWebhookRouter` sob `/webhook` e `onboardingRouter` sob `/api/onboarding` (antes do bloco `requireAuth`).
+- **`.env.example`**: nova var `BACKEND_PUBLIC_URL`. **`validate-env.ts`**: `ZAPI_ACCOUNT_TOKEN` e `BACKEND_PUBLIC_URL` viram opcionais (warning no boot; provisionamento responde 500 sem elas, resto do sistema segue).
+- **Testes**: `src/tests/onboarding.service.test.ts` novo (24 casos: signup happy/shared/rejeições/rollbacks, provisionZapi gate/criação/idempotência/erros, connection, webhook connected/disconnected/ambíguo/desconhecido); `billing.service.test.ts` +9 casos (`getTrialDays`, `isTrialActive` com data nula, `startTrialClock`, `toSubscriptionView` com `trialStarted`); helper `supabase-mock` ganha `insert`/`delete`. **213 testes passando** (180 → 213). Typecheck limpo.
+
+### Arquivos criados ou modificados
+- `migrations/011_subscriptions_and_zapi_provisioning.sql` — datas do trial nullable + trigger sem datas
+- `src/modules/onboarding/{onboarding.types,onboarding.service,onboarding.controller,onboarding.routes,index}.ts` (novos)
+- `src/modules/billing/{billing.service,billing.types,index}.ts` — `startTrialClock`, `getTrialDays`, `trialStarted`, datas nullable
+- `src/index.ts` — wiring do módulo onboarding
+- `.env.example` — `BACKEND_PUBLIC_URL`; `src/shared/utils/validate-env.ts` — `ZAPI_ACCOUNT_TOKEN`/`BACKEND_PUBLIC_URL` opcionais
+- `src/tests/onboarding.service.test.ts` (novo), `src/tests/billing.service.test.ts`, `src/tests/helpers/supabase-mock.ts`
+- `migrations/README.md`, `PLAN.md`, `docs/checklist-producao.md` — docs
+
+### Pendências para próxima sessão
+- [ ] **Pré-deploy**: rodar `migrations/011_subscriptions_and_zapi_provisioning.sql` no SQL Editor do Supabase (ainda não aplicada).
+- [ ] **Pré-deploy**: configurar `BACKEND_PUBLIC_URL` no Railway.
+- [ ] **Pré-deploy**: conferir o setting "Confirm email" no Supabase Auth — o cadastro nasce com e-mail não confirmado; "logar antes de confirmar" depende dessa config.
+- [ ] **Pré-deploy multi-instância**: instâncias provisionadas via Partner API não recebem o `ZAPI_CLIENT_TOKEN` compartilhado — `/webhook/whatsapp` (que valida esse token) só funciona para o piloto manual hoje. Configurar client-token por instância via API da Z-API ou migrar pra token por instância antes do 1º cliente self-service.
+- [ ] Conferir o shape exato dos payloads "On Connected"/"On Disconnected" da Z-API contra a doc antes do deploy (`classifyEvent` assume `type`/`connected`).
+- [ ] **Sprint 9.3** — frontend público (`/precos`, `/cadastro`, `/privacidade`, `/termos`) + interno (`/conectar-whatsapp` com QR + polling em `GET /api/onboarding/connection`, `/configuracoes/assinatura`, banner global de trial). O frontend dispara o e-mail de confirmação via `supabase.auth.resend({ type: 'signup' })`.
+
+---
+
 ## [2026-05-10] — Sprint 9.1 — Schema + billing + gate de trial no worker
 
 **Fase:** Fase 3 — Onboarding self-service (sub-sprint 1 de 3)

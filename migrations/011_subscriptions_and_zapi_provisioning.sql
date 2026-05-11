@@ -18,16 +18,19 @@
 --    chamado pelo worker após cada resposta da IA. Retorna a contagem nova
 --    para o caller decidir se atingiu cap.
 --
--- 4. Trigger AFTER INSERT em tenants — cria subscription com status='trial' e
---    trial_ends_at=now()+7d automaticamente. Garante que nenhum tenant fica
---    sem subscription, mesmo se cadastrado via SQL.
+-- 4. Trigger AFTER INSERT em tenants — cria subscription com status='trial' SEM
+--    datas (trial_started_at/trial_ends_at ficam NULL). O relógio dos 7 dias só
+--    começa quando o WhatsApp conecta de fato — o webhook /webhook/zapi-status
+--    chama billing.startTrialClock e preenche as datas. Garante que nenhum
+--    tenant fica sem subscription, mesmo se cadastrado via SQL.
 --
 -- 5. Backfill: tenants existentes (testes do Arthur) ganham subscription
 --    `active` com plan_id='legacy', para não serem cortados pelo gate do
 --    trial. Onboarding self-service (Sprint 9.2) cria como 'trial'.
 --
--- Decisões tomadas na entrevista (2026-05-10):
--- - Trial 7 dias OU 50 msgs (o que vier primeiro)
+-- Decisões tomadas nas entrevistas:
+-- - Trial 7 dias OU 50 msgs (o que vier primeiro) — 2026-05-10
+-- - Relógio do trial começa quando o WhatsApp conecta, não no cadastro — 2026-05-11
 -- - Pós-trial: IA desliga, painel acessível, `saveIncomingMessagesOnly`
 -- - Plano único no MVP — `plan_id` é text simples, gateway stub
 -- - ImobPro provisiona Z-API automaticamente (managed=true por default)
@@ -74,8 +77,10 @@ COMMENT ON COLUMN tenants.lgpd_accepted_at IS
 CREATE TABLE IF NOT EXISTS subscriptions (
   tenant_id           uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
   status              text         NOT NULL DEFAULT 'trial',
-  trial_started_at    timestamptz  NOT NULL DEFAULT now(),
-  trial_ends_at       timestamptz  NOT NULL,
+  -- NULL = trial ainda não começou (WhatsApp não conectado). Preenchidas quando
+  -- a instância Z-API conecta (billing.startTrialClock no webhook zapi-status).
+  trial_started_at    timestamptz,
+  trial_ends_at       timestamptz,
   trial_message_count integer      NOT NULL DEFAULT 0,
   plan_id             text,
   subscribed_at       timestamptz,
@@ -102,6 +107,12 @@ CREATE INDEX IF NOT EXISTS subscriptions_trial_ends_idx
 
 COMMENT ON TABLE subscriptions IS
   'Assinatura/trial por tenant. Lifecycle: trial → expired (cap atingido ou prazo vencido) → active (assinou) → canceled.';
+
+COMMENT ON COLUMN subscriptions.trial_started_at IS
+  'NULL enquanto o trial não começou (WhatsApp não conectado). Preenchido por billing.startTrialClock quando a instância Z-API conecta.';
+
+COMMENT ON COLUMN subscriptions.trial_ends_at IS
+  'NULL até o WhatsApp conectar; então trial_started_at + TRIAL_DAYS. O cron expire-trials (.lt em trial_ends_at) ignora naturalmente as linhas com data NULL.';
 
 COMMENT ON COLUMN subscriptions.trial_message_count IS
   'Mensagens da IA respondidas durante o trial. Incrementado via RPC increment_trial_message_count após cada resposta. Cap: 50 (TRIAL_MESSAGE_LIMIT).';
@@ -185,7 +196,9 @@ CREATE TRIGGER subscriptions_updated_at
 --
 -- Garante invariante "todo tenant tem subscription". Aplicado tanto no
 -- onboarding self-service (Sprint 9.2) quanto em tenants criados via SQL.
--- ON CONFLICT DO NOTHING para o backfill abaixo não falhar.
+-- Cria com status='trial' SEM datas — o relógio dos 7 dias só inicia quando o
+-- WhatsApp conecta (billing.startTrialClock). ON CONFLICT DO NOTHING para o
+-- backfill abaixo não falhar.
 
 CREATE OR REPLACE FUNCTION public.create_default_subscription()
 RETURNS trigger
@@ -194,8 +207,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  INSERT INTO subscriptions (tenant_id, status, trial_started_at, trial_ends_at)
-  VALUES (NEW.id, 'trial', now(), now() + interval '7 days')
+  INSERT INTO subscriptions (tenant_id, status)
+  VALUES (NEW.id, 'trial')
   ON CONFLICT (tenant_id) DO NOTHING;
   RETURN NEW;
 END;

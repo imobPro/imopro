@@ -5,11 +5,13 @@ import type { Subscription, SubscriptionStatus, SubscriptionView } from './billi
 const SUBSCRIPTION_COLUMNS =
   'tenant_id, status, trial_started_at, trial_ends_at, trial_message_count, plan_id, subscribed_at, canceled_at'
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 interface SubscriptionRow {
   tenant_id: string
   status: SubscriptionStatus
-  trial_started_at: string
-  trial_ends_at: string
+  trial_started_at: string | null
+  trial_ends_at: string | null
   trial_message_count: number
   plan_id: string | null
   subscribed_at: string | null
@@ -35,6 +37,12 @@ export function getTrialMessageLimit(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 50
 }
 
+export function getTrialDays(): number {
+  const raw = process.env.TRIAL_DAYS
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7
+}
+
 /**
  * Lê a subscription do tenant. O trigger da migration 011 garante que toda
  * inserção em `tenants` cria uma subscription, então NULL aqui significa erro
@@ -56,17 +64,19 @@ export async function getSubscription(tenantId: string): Promise<Subscription | 
 }
 
 /**
- * Trial ativo = status `trial` E ainda dentro do prazo E abaixo do cap.
+ * Trial ativo = status `trial` E abaixo do cap de mensagens E (ou o relógio
+ * ainda não começou, ou começou e ainda está no prazo).
+ *
+ * `trialEndsAt === null` significa "trial pendente" — o cliente se cadastrou mas
+ * ainda não conectou o WhatsApp, então nada foi consumido: tratamos como ativo.
  * Atingir o cap NÃO marca expired aqui — quem persiste é o caller após
  * incrementar (mantém a operação atômica simples).
  */
 export function isTrialActive(sub: Subscription): boolean {
   if (sub.status !== 'trial') return false
-  const now = Date.now()
-  const trialEnd = new Date(sub.trialEndsAt).getTime()
-  if (now >= trialEnd) return false
   if (sub.trialMessageCount >= getTrialMessageLimit()) return false
-  return true
+  if (!sub.trialEndsAt) return true // relógio ainda não começou (WhatsApp não conectado)
+  return Date.now() < new Date(sub.trialEndsAt).getTime()
 }
 
 /**
@@ -96,6 +106,31 @@ export async function incrementTrialMessageCount(tenantId: string): Promise<numb
   }
   if (typeof data !== 'number') return null
   return data
+}
+
+/**
+ * Inicia o relógio do trial: grava `trial_started_at = now()` e
+ * `trial_ends_at = now() + TRIAL_DAYS`. Chamado pelo webhook /webhook/zapi-status
+ * quando a instância Z-API conecta pela primeira vez.
+ *
+ * Idempotente via guarda `trial_started_at IS NULL`: reconectar depois de uma
+ * queda não reinicia o relógio, e um trial já `expired`/`active` (status != trial)
+ * também não é tocado.
+ */
+export async function startTrialClock(tenantId: string): Promise<void> {
+  const now = new Date()
+  const endsAt = new Date(now.getTime() + getTrialDays() * DAY_MS)
+
+  const { error } = await supabase
+    .from('subscriptions')
+    .update({ trial_started_at: now.toISOString(), trial_ends_at: endsAt.toISOString() })
+    .eq('tenant_id', tenantId)
+    .eq('status', 'trial')
+    .is('trial_started_at', null)
+
+  if (error) {
+    console.error(`[Billing] startTrialClock falhou tenant=${tenantId}: ${error.message}`)
+  }
 }
 
 /**
@@ -167,17 +202,21 @@ export async function expireTrialsByTime(): Promise<number> {
 /**
  * View enriquecida para a API. Calcula remaining a partir do limite atual e
  * `accessAllowed` aplicando isAccessAllowed — frontend não precisa repetir.
+ * Quando o trial ainda não começou (`trialEndsAt === null`), `trialDaysRemaining`
+ * reporta o período cheio (TRIAL_DAYS) e `trialStarted` fica false.
  */
 export function toSubscriptionView(sub: Subscription): SubscriptionView {
   const limit = getTrialMessageLimit()
   const remainingMsgs = Math.max(0, limit - sub.trialMessageCount)
-  const msUntilEnd = new Date(sub.trialEndsAt).getTime() - Date.now()
-  const remainingDays = Math.max(0, Math.ceil(msUntilEnd / (24 * 60 * 60 * 1000)))
+  const remainingDays = sub.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(sub.trialEndsAt).getTime() - Date.now()) / DAY_MS))
+    : getTrialDays()
   return {
     ...sub,
     trialMessageLimit: limit,
     trialMessagesRemaining: remainingMsgs,
     trialDaysRemaining: remainingDays,
+    trialStarted: sub.trialStartedAt !== null,
     accessAllowed: isAccessAllowed(sub),
   }
 }
