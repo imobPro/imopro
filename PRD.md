@@ -1,6 +1,6 @@
 # PRD.md — Product Requirements Document
 
-ImobBot SaaS · Versão 1.0 · Arthur CG · 2026
+ImobPro SaaS 
 
 ---
 
@@ -96,7 +96,7 @@ A imobiliária assina o plano, conecta seu número do WhatsApp e passa a ter um 
 - **LGPD**: opt-in explícito, opt-out em qualquer momento, direito de exclusão
 - **Disponibilidade**: 99.5% uptime mínimo — o atendimento não pode cair
 - **Isolamento**: dados de uma imobiliária jamais visíveis para outra (RLS)
-- **Latência**: resposta ao lead em menos de 5 segundos após receber mensagem
+- **Latência**: resposta ao lead em menos de 6 segundos após receber mensagem
 - **Segurança**: JWT com expiração, variáveis de ambiente, sem secrets no código
 - **Escalabilidade**: arquitetura suporta 100 tenants sem refatoração
 

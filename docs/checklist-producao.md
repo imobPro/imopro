@@ -4,11 +4,12 @@ Tudo que precisa estar **pago, contratado ou configurado** para rodar o ImobPro
 com cliente real, organizado por urgência. Atualize toda vez que mudar de plano,
 contratar serviço ou descobrir um novo limite de free tier.
 
-> **Status atual (2026-05-11):** desenvolvimento local. Nenhum cliente piloto.
+> **Status atual (2026-05-16):** desenvolvimento local. Nenhum cliente piloto.
 > Tudo rodando em free tier. Resend ainda **não testado** (depende de domínio).
 > LGPD documental: rascunho criado em `docs/privacidade.md` e `docs/termos.md`
 > — precisa de revisão de advogado antes da operação em escala.
 > Sprint 9.2 (onboarding backend) entregue — ver itens novos na seção 🟢 Fase 3.
+> Migrations 011 e 012 já aplicadas no Supabase.
 
 ---
 
@@ -64,7 +65,7 @@ Necessário quando o ImobPro vira produto que cliente assina sozinho.
 
 | Item | Notas |
 |---|---|
-| **Rodar migration 012 no Supabase** | `migrations/011_...sql` aplicada por Arthur em 2026-05-11. Falta a `012_trial_clock_fixup.sql` — fix-up **idempotente** que garante `trial_started_at`/`trial_ends_at` nullable + o trigger sem datas (a 011 usa `CREATE TABLE IF NOT EXISTS`; se uma versão anterior dela já tinha sido aplicada, as colunas continuariam NOT NULL e a criação de tenant falharia). Rodar por segurança — no-op se a 011 atual já está no banco. |
+| ~~**Rodar migration 012 no Supabase**~~ ✅ | Aplicada por Arthur em 2026-05-16. Migrations 011 e 012 fechadas. |
 | **`BACKEND_PUBLIC_URL` no Railway** | URL pública do backend (ex.: `https://imobpro.up.railway.app`). A Z-API posta nela as callbacks das instâncias provisionadas (`/webhook/whatsapp` e `/webhook/zapi-status`). Sem ela, `POST /api/onboarding/provision-zapi` responde 500. |
 | **Setting "Confirm email" no Supabase Auth** | O cadastro cria o usuário com e-mail **não confirmado** (o provisionamento Z-API exige confirmação). A experiência "logar e ver o painel antes de confirmar" pressupõe que o login não seja bloqueado por e-mail não confirmado — conferir Authentication → Providers → Email. O e-mail de confirmação em si usa o sender embutido do Supabase (rate-limited) até existir domínio + Resend. |
 | **Client-token por instância (Z-API)** | As instâncias provisionadas via Partner API **não** recebem o `ZAPI_CLIENT_TOKEN` compartilhado por padrão — o `/webhook/whatsapp`, que valida esse token, só funciona para o piloto manual. Antes do 1º cliente self-service: configurar o client-token de cada instância criada (precisa de uma chamada nova na API da Z-API) ou migrar `/webhook/whatsapp` para validar token por instância. (`/webhook/zapi-status` já roda sem token — `instanceId` atua como segredo.) |

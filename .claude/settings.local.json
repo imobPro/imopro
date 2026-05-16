@@ -19,7 +19,12 @@
       "WebFetch(domain:github.com)",
       "Bash(/c/Program Files/Git/cmd/git.exe status *)",
       "Bash(\"/c/Program Files/Git/cmd/git.exe\" add .gitignore .claude/settings.local.json)",
-      "Bash(\"/c/Program Files/Git/cmd/git.exe\" commit -m \"Atualiza permissoes do Claude Code e ignora lock files internos\")"
+      "Bash(\"/c/Program Files/Git/cmd/git.exe\" commit -m \"Atualiza permissoes do Claude Code e ignora lock files internos\")",
+      "Bash(dir /b *.json *.lock)",
+      "Bash(dir /b frontend\\\\*.json frontend\\\\*.lock)",
+      "Bash(/c/Program Files/Git/bin/ls.exe *)",
+      "Bash(/c/Program Files/nodejs/npm.cmd run *)",
+      "Bash(/c/Program Files/Git/bin/git.exe diff *)"
     ]
   }
 }
