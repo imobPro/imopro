@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ArrowRight, CreditCard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentAgent } from "@/lib/queries/agents";
 import { getSettings } from "@/lib/queries/settings";
+import { Card, CardContent } from "@/components/ui/card";
 import { SettingsForm } from "./settings-form";
 
 export const metadata = { title: "Configurações — ImobPro" };
@@ -31,6 +34,23 @@ export default async function ConfiguracoesPage() {
           próxima mensagem que o lead enviar.
         </p>
       </header>
+
+      <Link href="/configuracoes/assinatura" className="block group">
+        <Card className="transition-colors group-hover:bg-muted/30">
+          <CardContent className="flex items-center gap-3 py-3">
+            <div className="flex size-9 items-center justify-center rounded-md bg-primary/15 text-primary">
+              <CreditCard className="size-4" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-foreground">Assinatura</p>
+              <p className="text-xs text-muted-foreground">
+                Acompanhe seu trial e ative seu plano.
+              </p>
+            </div>
+            <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {settings ? (
         <SettingsForm

@@ -5,6 +5,7 @@ import { SidebarNav } from "@/components/shell/sidebar-nav";
 import { BottomTabs } from "@/components/shell/bottom-tabs";
 import { MobileTopBar } from "@/components/shell/mobile-top-bar";
 import { NotificationBanner } from "@/components/shell/notification-banner";
+import { TrialBanner } from "@/components/trial-banner";
 
 export default async function AppLayout({
   children,
@@ -19,6 +20,10 @@ export default async function AppLayout({
 
   // Middleware já redireciona anônimos — este check é defensivo.
   if (!user) redirect("/login");
+
+  // Gate de e-mail confirmado: enquanto o cliente não confirma o e-mail, fica
+  // numa tela cheia bloqueante em /verificar-email (fora do shell do painel).
+  if (!user.email_confirmed_at) redirect("/verificar-email");
 
   const agent = await getCurrentAgent(supabase, user.id);
 
@@ -45,6 +50,7 @@ export default async function AppLayout({
 
       <div className="flex-1 flex flex-col min-w-0">
         <MobileTopBar agentName={agent.name} />
+        <TrialBanner />
         <NotificationBanner />
         <main className="flex-1 min-w-0 pb-16 md:pb-0">{children}</main>
         <BottomTabs />
