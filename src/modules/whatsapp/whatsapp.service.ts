@@ -1,6 +1,7 @@
 import { whatsappQueue } from '../../shared/queue/queues'
 import { redisConnection } from '../../shared/queue/redis'
 import { runOnce } from '../../shared/queue/idempotency'
+import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
 import { getNextBusinessDay, type BusinessHoursConfig } from '../../shared/utils/business-hours'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
 import type { PendingMessage } from '../ai-engine/ai-engine.types'
@@ -283,6 +284,14 @@ export async function sendTextOnce(
   label: string,
   payload: ZApiSendTextPayload,
 ): Promise<boolean> {
+  // Breadcrumb pra reconstruir o caminho no Sentry quando o job falha — mostra
+  // o que tentamos enviar antes da exceção. Não polui logs em sucesso (Sentry
+  // só anexa breadcrumbs quando reporta um evento).
+  addExternalCallBreadcrumb({
+    service: 'zapi',
+    operation: `sendText:${label}`,
+    data: { phone: payload.phone, jobId },
+  })
   const result = await runOnce(jobId, `sendText:${label}`, () => zapi.sendText(payload))
   return result.ran
 }

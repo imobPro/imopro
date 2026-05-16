@@ -1,4 +1,5 @@
 import { supabase } from '../../shared/database/supabase'
+import { captureSilentError } from '../../shared/observability/sentry'
 import type {
   IncomingMessage,
   Lead,
@@ -113,8 +114,14 @@ export async function scoreUp(
   })
 
   if (error) {
-    // Fallback não-atômico: read-then-write. Logar é importante para detectar regressão da RPC.
-    console.error(`[Leads] scoreUp RPC falhou — usando fallback não-atômico | leadId=${leadId} erro=${error.message}`)
+    // Fallback não-atômico: read-then-write. Reportar ao Sentry pra detectar
+    // regressão da RPC.
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'scoreUp.rpc (usando fallback não-atômico)',
+      tenantId,
+      leadId,
+    })
 
     const { data: lead } = await supabase
       .from('leads')
@@ -278,7 +285,12 @@ export async function getConversationStats(
   // Conversation pode não existir ainda na 1ª mensagem do lead — não é erro.
   // PGRST116 = "no rows" (caso ocorra mesmo com maybeSingle, ignoramos).
   if (error && error.code !== 'PGRST116') {
-    console.error(`[Leads] getConversationStats falhou | leadId=${leadId} erro=${error.message}`)
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'getConversationStats',
+      tenantId,
+      leadId,
+    })
   }
 
   return {
@@ -305,7 +317,12 @@ export async function getConversationHistory(
   })
 
   if (error) {
-    console.error(`[Leads] getConversationHistory RPC falhou | leadId=${leadId} erro=${error.message}`)
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'getConversationHistory.rpc',
+      tenantId,
+      leadId,
+    })
     return []
   }
   if (!data || data.length === 0) return []
@@ -338,7 +355,12 @@ export async function updateConversationSentiment(
     )
 
   if (error) {
-    console.error(`[Leads] updateConversationSentiment falhou | leadId=${leadId} erro=${error.message}`)
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'updateConversationSentiment',
+      tenantId,
+      leadId,
+    })
   }
 }
 
@@ -364,8 +386,15 @@ export async function persistAiFailure(
     )
 
   if (error) {
-    // Crítico: lição 070 — sem persistir, "2 falhas → transferir" não dispara entre jobs
-    console.error(`[Leads] persistAiFailure falhou | leadId=${leadId} erro=${error.message}`)
+    // Crítico (lessons.md): sem persistir, "2 falhas → transferir" não dispara
+    // entre jobs. Reportar ao Sentry pra não passar despercebido.
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'persistAiFailure',
+      tenantId,
+      leadId,
+      extra: { aiFailedAttempts },
+    })
   }
 }
 
@@ -396,7 +425,10 @@ export async function flagInactiveLeads(tenantId: string): Promise<number> {
 export async function flagInactiveLeadsAllTenants(): Promise<{ tenants: number; flagged: number }> {
   const { data: tenants, error } = await supabase.from('tenants').select('id')
   if (error) {
-    console.error(`[Leads] flagInactiveLeadsAllTenants falhou ao listar tenants: ${error.message}`)
+    captureSilentError(error, {
+      module: 'Leads',
+      operation: 'flagInactiveLeadsAllTenants.listTenants',
+    })
     return { tenants: 0, flagged: 0 }
   }
 
@@ -405,8 +437,11 @@ export async function flagInactiveLeadsAllTenants(): Promise<{ tenants: number; 
     try {
       flagged += await flagInactiveLeads(t.id)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[Leads] flagInactive tenant=${t.id} falhou: ${msg}`)
+      captureSilentError(err, {
+        module: 'Leads',
+        operation: 'flagInactiveLeads (per tenant)',
+        tenantId: t.id,
+      })
     }
   }
   return { tenants: tenants?.length ?? 0, flagged }

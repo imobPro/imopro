@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI, { toFile } from 'openai'
+import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
 import { buildSystemPrompt, buildHandoffPreparatorySystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
@@ -59,6 +60,12 @@ export async function transcribeAudio(
 ): Promise<string | null> {
   try {
     const openai = getOpenAI()
+
+    addExternalCallBreadcrumb({
+      service: 'openai',
+      operation: 'audio.transcriptions.create',
+      data: { mimeType },
+    })
 
     const response = await fetch(mediaUrl)
     if (!response.ok) {
@@ -155,6 +162,12 @@ export async function generateResponse(
   const systemPrompt = handoffMode
     ? buildHandoffPreparatorySystemPrompt(config)
     : buildSystemPrompt(config)
+
+  addExternalCallBreadcrumb({
+    service: 'anthropic',
+    operation: handoffMode ? 'messages.create (handoff)' : 'messages.create',
+    data: { tenantId, phone, model: MODEL, historyLen: trimmedHistory.length },
+  })
 
   let rawText: string
   try {

@@ -1,4 +1,5 @@
 import { Worker } from 'bullmq'
+import * as Sentry from '@sentry/node'
 import { redisConnection } from '../../shared/queue/redis'
 import {
   billingQueue,
@@ -57,6 +58,19 @@ export function startBillingWorker(): Worker<BillingJobData> {
 
   worker.on('failed', (job, err) => {
     console.error(`[Billing] Job ${job?.name ?? '?'} falhou: ${err.message}`)
+    Sentry.withScope((scope) => {
+      scope.setTag('queue', BILLING_QUEUE_NAME)
+      scope.setTag('job_name', job?.name ?? 'unknown')
+      if (job?.id) scope.setTag('job_id', job.id)
+      Sentry.captureException(err)
+    })
+  })
+
+  worker.on('error', (err) => {
+    console.error('[Billing] Erro no worker:', err.message)
+    Sentry.captureException(err, {
+      tags: { queue: BILLING_QUEUE_NAME, kind: 'worker_error' },
+    })
   })
 
   return worker

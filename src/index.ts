@@ -1,8 +1,13 @@
-import 'dotenv/config'
+// IMPORTANTE: ./instrument importa dotenv/config e inicializa o Sentry.
+// Deve ser o primeiro import deste arquivo para que outros módulos sejam
+// criados com o cliente Sentry já ativo.
+import './instrument'
+
 import { validateEnv } from './shared/utils/validate-env'
 validateEnv()
 
 import express from 'express'
+import * as Sentry from '@sentry/node'
 import helmet from 'helmet'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
@@ -53,6 +58,11 @@ app.use('/api', apiLimiter, requireAuth, authRouter)
 app.use('/api/reports', apiLimiter, requireAuth, reportsRouter)
 app.use('/api/settings', apiLimiter, requireAuth, tenantSettingsRouter)
 app.use('/api/subscription', apiLimiter, requireAuth, billingRouter)
+
+// Sentry: precisa vir ANTES do errorHandler para capturar a exception bruta
+// (com stacktrace original). O errorHandler customizado roda depois para
+// devolver o JSON consistente ao cliente.
+Sentry.setupExpressErrorHandler(app)
 
 app.use(errorHandler)
 

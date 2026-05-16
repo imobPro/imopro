@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express'
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose'
 import { findActiveAgentByUserId, AgentLookupError } from '../../modules/agents'
+import { captureSilentError } from '../observability/sentry'
 
 // -----------------------------------------------------------------------------
 // JWKS cache — Supabase Auth expõe public keys em /auth/v1/.well-known/jwks.json.
@@ -66,6 +67,11 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     agent = await findActiveAgentByUserId(payload.sub)
   } catch (err) {
     if (err instanceof AgentLookupError) {
+      captureSilentError(err, {
+        module: 'Auth',
+        operation: 'findActiveAgentByUserId',
+        extra: { userId: payload.sub },
+      })
       res.status(500).json({ error: { code: 'AGENT_LOOKUP_FAILED', message: 'Falha ao consultar corretor' } })
       return
     }

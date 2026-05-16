@@ -27,6 +27,7 @@
   "homepage": "https://github.com/imobPro/imopro#readme",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
+    "@sentry/node": "^10.53.1",
     "@supabase/supabase-js": "^2.103.3",
     "@types/pdfmake": "^0.3.2",
     "bcryptjs": "^3.0.3",

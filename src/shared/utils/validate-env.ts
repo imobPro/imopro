@@ -19,12 +19,14 @@ const REQUIRED_VARS: string[] = [
 // ZAPI_ACCOUNT_TOKEN / BACKEND_PUBLIC_URL: provisionamento de instância Z-API no
 //   onboarding (POST /api/onboarding/provision-zapi). Sem eles a rota responde
 //   500 SERVER_MISCONFIGURED; o restante do sistema (piloto manual) segue normal.
+// SENTRY_DSN: relatórios de erro. Ausente em dev local; configurar em produção.
 const OPTIONAL_VARS: string[] = [
   'OPENAI_API_KEY',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'ZAPI_ACCOUNT_TOKEN',
   'BACKEND_PUBLIC_URL',
+  'SENTRY_DSN',
 ]
 
 export function validateEnv(): void {
