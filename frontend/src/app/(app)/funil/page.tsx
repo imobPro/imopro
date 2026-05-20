@@ -22,11 +22,11 @@ export default async function FunnelPage() {
 
   return (
     <div className="flex flex-col">
-      <header className="px-4 pt-4 md:px-6 md:pt-6">
-        <h1 className="font-display text-3xl md:text-4xl text-foreground">
+      <header className="px-4 pt-6 md:px-6 md:pt-8">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Funil de conversão
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-2">
           Cada coluna mostra os leads no respectivo status. Toque num card para
           abrir a conversa.
         </p>

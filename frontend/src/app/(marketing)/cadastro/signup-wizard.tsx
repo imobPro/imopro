@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { signupAction } from "./actions";
 
@@ -32,6 +33,10 @@ const INITIAL_DATA: WizardData = {
   phone: "",
   acceptedTerms: false,
 };
+
+const FIELD_INPUT_CLASS = "h-11 rounded-lg shadow-clay-card";
+const FIELD_LABEL_CLASS =
+  "text-xs font-medium uppercase tracking-wider text-muted-foreground";
 
 function digitsOnly(value: string): string {
   return value.replace(/\D/g, "");
@@ -183,13 +188,14 @@ export function SignupWizard({ planoHint }: Props) {
 
 function StepIndicator({ step }: { step: Step }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-2">
       {[1, 2, 3].map((n) => (
         <div
           key={n}
-          className={`h-1 flex-1 rounded-full transition-colors ${
-            n <= step ? "bg-primary" : "bg-muted"
-          }`}
+          className={cn(
+            "h-1.5 flex-1 rounded-full transition-colors duration-base ease-out-quart",
+            n <= step ? "bg-primary" : "bg-muted",
+          )}
           aria-label={`Passo ${n}${n === step ? " (atual)" : ""}`}
         />
       ))}
@@ -216,8 +222,10 @@ function Step1({
       }}
       className="flex flex-col gap-4"
     >
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="fullName">Nome completo</Label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="fullName" className={FIELD_LABEL_CLASS}>
+          Nome completo
+        </Label>
         <Input
           id="fullName"
           name="fullName"
@@ -225,11 +233,14 @@ function Step1({
           required
           value={data.fullName}
           onChange={(e) => update("fullName", e.target.value)}
+          className={FIELD_INPUT_CLASS}
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="email">E-mail</Label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email" className={FIELD_LABEL_CLASS}>
+          E-mail
+        </Label>
         <Input
           id="email"
           name="email"
@@ -238,11 +249,14 @@ function Step1({
           required
           value={data.email}
           onChange={(e) => update("email", e.target.value)}
+          className={FIELD_INPUT_CLASS}
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Senha</Label>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="password" className={FIELD_LABEL_CLASS}>
+          Senha
+        </Label>
         <Input
           id="password"
           name="password"
@@ -251,11 +265,18 @@ function Step1({
           required
           value={data.password}
           onChange={(e) => update("password", e.target.value)}
+          className={FIELD_INPUT_CLASS}
         />
         <p className="text-xs text-muted-foreground">Mínimo de 8 caracteres.</p>
       </div>
 
-      <Button type="submit" disabled={pending} className="mt-1">
+      <Button
+        type="submit"
+        variant="swatch"
+        size="clay"
+        disabled={pending}
+        className="mt-2"
+      >
         Continuar
       </Button>
     </form>
@@ -278,7 +299,7 @@ function Step2({
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
-        <Label>Como você atende?</Label>
+        <Label className={FIELD_LABEL_CLASS}>Como você atende?</Label>
         <div className="flex flex-col gap-2">
           <ModeOption
             checked={data.operationMode === "individual"}
@@ -296,22 +317,25 @@ function Step2({
       </div>
 
       {data.operationMode === "shared" ? (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="realtyName">Nome da imobiliária</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="realtyName" className={FIELD_LABEL_CLASS}>
+            Nome da imobiliária
+          </Label>
           <Input
             id="realtyName"
             name="realtyName"
             required
             value={data.realtyName}
             onChange={(e) => update("realtyName", e.target.value)}
+            className={FIELD_INPUT_CLASS}
           />
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="phone">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="phone" className={FIELD_LABEL_CLASS}>
           Seu WhatsApp{" "}
-          <span className="text-xs text-muted-foreground">(opcional)</span>
+          <span className="text-muted-foreground normal-case tracking-normal">(opcional)</span>
         </Label>
         <Input
           id="phone"
@@ -320,6 +344,7 @@ function Step2({
           placeholder="55DDXXXXXXXXX"
           value={data.phone}
           onChange={(e) => update("phone", e.target.value)}
+          className={FIELD_INPUT_CLASS}
         />
         <p className="text-xs text-muted-foreground">
           Usado pra te notificar quando um lead esquentar. Você pode preencher
@@ -327,11 +352,23 @@ function Step2({
         </p>
       </div>
 
-      <div className="flex gap-2 mt-1">
-        <Button type="button" variant="outline" onClick={onBack} className="flex-1">
+      <div className="flex gap-2 mt-2">
+        <Button
+          type="button"
+          variant="clay-secondary"
+          size="clay"
+          onClick={onBack}
+          className="flex-1"
+        >
           Voltar
         </Button>
-        <Button type="submit" disabled={pending} className="flex-1">
+        <Button
+          type="submit"
+          variant="swatch"
+          size="clay"
+          disabled={pending}
+          className="flex-1"
+        >
           Continuar
         </Button>
       </div>
@@ -352,9 +389,12 @@ function ModeOption({
 }) {
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
-        checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
-      }`}
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-all duration-fast ease-out-quart",
+        checked
+          ? "border-primary bg-matcha-300/20 dark:bg-matcha-300/10 shadow-clay-card"
+          : "border-border hover:border-border-dashed hover:bg-muted/40",
+      )}
     >
       <input
         type="radio"
@@ -390,8 +430,8 @@ function Step3({
       }}
       className="flex flex-col gap-4"
     >
-      <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-        <dl className="space-y-1.5">
+      <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">
+        <dl className="flex flex-col gap-2">
           <ReviewItem label="Nome" value={data.fullName} />
           <ReviewItem label="E-mail" value={data.email} />
           <ReviewItem
@@ -440,17 +480,24 @@ function Step3({
         </span>
       </label>
 
-      <div className="flex gap-2 mt-1">
+      <div className="flex gap-2 mt-2">
         <Button
           type="button"
-          variant="outline"
+          variant="clay-secondary"
+          size="clay"
           onClick={onBack}
           disabled={pending}
           className="flex-1"
         >
           Voltar
         </Button>
-        <Button type="submit" disabled={pending} className="flex-1">
+        <Button
+          type="submit"
+          variant="swatch"
+          size="clay"
+          disabled={pending}
+          className="flex-1"
+        >
           {pending ? "Criando..." : "Criar conta"}
         </Button>
       </div>
@@ -461,7 +508,9 @@ function Step3({
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-xs uppercase tracking-wider font-medium text-muted-foreground">
+        {label}
+      </dt>
       <dd className="text-xs text-foreground text-right truncate">{value}</dd>
     </div>
   );

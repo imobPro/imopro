@@ -35,10 +35,12 @@ export function NewLeadsBanner({ tenantId, loadedAt }: Props) {
   if (count <= 0) return null;
 
   return (
-    <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
+    <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-lemon-700/30 bg-lemon-400/20 px-4 py-2.5 text-sm animate-in fade-in slide-in-from-top-1 duration-base ease-out-quart dark:bg-lemon-400/10">
       <div className="flex items-center gap-2 text-foreground min-w-0">
-        <ArrowDown className="size-4 shrink-0" />
-        <span className="truncate">
+        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-lemon-500 text-foreground">
+          <ArrowDown className="size-3.5" />
+        </span>
+        <span className="truncate font-medium">
           {count === 1
             ? "1 novo lead desde que você abriu a tela"
             : `${count} novos leads desde que você abriu a tela`}
@@ -46,7 +48,7 @@ export function NewLeadsBanner({ tenantId, loadedAt }: Props) {
       </div>
       <Button
         type="button"
-        variant="outline"
+        variant="clay-secondary"
         size="xs"
         disabled={pending}
         onClick={() => startTransition(() => router.refresh())}

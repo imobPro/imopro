@@ -23,7 +23,7 @@ export default async function MetricsPage() {
   return (
     <div className="flex flex-col gap-5 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl md:text-4xl text-foreground">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Métricas
         </h1>
         <p className="text-sm text-muted-foreground">

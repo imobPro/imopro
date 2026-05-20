@@ -1,22 +1,71 @@
 import * as React from "react"
+import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+
+const cardVariants = cva(
+  "group/card relative flex flex-col gap-4 overflow-hidden bg-card py-4 text-sm text-card-foreground has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+  {
+    variants: {
+      variant: {
+        default: "rounded-xl ring-1 ring-foreground/10",
+        clay:
+          "rounded-2xl border border-border shadow-clay-card transition-all duration-base ease-out-quart hover:-rotate-1 hover:-translate-y-0.5 hover:shadow-clay-soft",
+        flat: "rounded-xl border border-border",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+)
+
+const ACCENT_STRIPE: Record<string, string> = {
+  matcha: "bg-matcha-600",
+  slushie: "bg-slushie-500",
+  lemon: "bg-lemon-500",
+  ube: "bg-ube-300",
+  pomegranate: "bg-pomegranate-400",
+  dragonfruit: "bg-dragonfruit",
+  blueberry: "bg-blueberry-800",
+}
+
+type CardAccent = keyof typeof ACCENT_STRIPE
+
+type CardProps = React.ComponentProps<"div"> &
+  VariantProps<typeof cardVariants> & {
+    size?: "default" | "sm"
+    accent?: CardAccent
+  }
 
 function Card({
   className,
   size = "default",
+  variant = "default",
+  accent,
+  children,
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: CardProps) {
   return (
     <div
       data-slot="card"
       data-size={size}
-      className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
-        className
-      )}
+      data-variant={variant}
+      data-accent={accent}
+      className={cn(cardVariants({ variant }), className)}
       {...props}
-    />
+    >
+      {accent ? (
+        <span
+          aria-hidden
+          className={cn(
+            "absolute top-0 inset-x-0 h-1 z-10",
+            ACCENT_STRIPE[accent],
+          )}
+        />
+      ) : null}
+      {children}
+    </div>
   )
 }
 
@@ -100,4 +149,5 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  cardVariants,
 }

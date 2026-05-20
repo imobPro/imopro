@@ -1,0 +1,73 @@
+# Instrução — Instalar MCPs de Desenvolvimento
+
+Use este arquivo para instalar os MCPs que melhoram o desenvolvimento do ImobPro.
+Cole o prompt no Claude Code quando estiver pronto para instalar.
+
+---
+
+## MCP 1 — Playwright (testes automáticos do painel)
+
+O que faz: permite o Claude Code abrir o painel, clicar em botões,
+preencher formulários e testar telas automaticamente sem você fazer nada.
+
+Prompt para o Claude Code:
+"Instala o Playwright MCP no projeto ImobPro.
+Depois de instalar, usa ele para testar automaticamente:
+1. Tela de login — entrar com credenciais válidas e inválidas
+2. Navegação entre as abas do painel (Caixa de entrada, Leads, Funil, Métricas, Relatórios)
+3. Tela de configurações — verificar se carrega corretamente
+Reporta o resultado de cada teste."
+
+Instalação manual (se preferir):
+npx @playwright/mcp install
+
+---
+
+## MCP 2 — ChromeDevTools (debug de frontend)
+
+O que faz: conecta o Claude Code ao Chrome em tempo real.
+Ele vê erros, inspeciona elementos e identifica problemas no painel
+sem você precisar descrever o que está quebrado.
+
+Prompt para o Claude Code:
+"Instala o ChromeDevTools MCP no projeto ImobPro.
+Depois de instalar, abre o painel em localhost:3000,
+inspeciona se há erros no console e reporta qualquer problema encontrado."
+
+Instalação manual (se preferir):
+npx @modelcontextprotocol/server-puppeteer install
+
+---
+
+## MCP 3 — FireCrawl (análise de concorrentes e docs)
+
+O que faz: extrai conteúdo completo de sites.
+Útil para analisar concorrentes e puxar documentações de APIs.
+
+Prompt para o Claude Code (quando quiser usar):
+"Usa o FireCrawl MCP para acessar o site do Kommo (kommo.com)
+e extrair como eles apresentam as funcionalidades de atendimento.
+Depois compara com o ImobPro e sugere melhorias."
+
+Instalação manual:
+npx firecrawl-mcp install
+
+---
+
+## Quando instalar
+
+✅ Playwright e ChromeDevTools — agora, antes de finalizar o Sprint 8.5
+✅ FireCrawl — quando quiser analisar concorrentes ou documentações
+❌ Glift — não necessário para o ImobPro
+❌ Perplexity — Context7 já resolve a mesma necessidade
+
+---
+
+## Ordem recomendada
+
+1. Instala o Playwright
+2. Roda os testes automáticos no painel
+3. Instala o ChromeDevTools
+4. Abre o painel e pede para o Claude inspecionar erros
+5. Corrige o que for encontrado
+6. Só então avança para o próximo sprint

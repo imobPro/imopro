@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, OctagonAlert, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   provisionZapiAction,
   pollConnectionAction,
@@ -115,8 +116,8 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
   if (error) {
     return (
       <div className="flex flex-col items-center gap-4 text-center py-2">
-        <div className="flex size-12 items-center justify-center rounded-full bg-destructive/15 text-destructive">
-          <OctagonAlert className="size-6" />
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-pomegranate-400/20 text-pomegranate-400">
+          <OctagonAlert className="size-7" />
         </div>
         <div className="space-y-1">
           <p className="font-medium">Não foi possível criar sua instância do WhatsApp.</p>
@@ -126,6 +127,8 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
         </div>
         <Button
           type="button"
+          variant="swatch"
+          size="clay"
           onClick={handleRegenerate}
           disabled={provisioning}
         >
@@ -138,11 +141,11 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
   const showSkeleton = !qrCode || provisioning;
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative aspect-square w-full max-w-[260px] overflow-hidden rounded-lg border bg-muted/30">
+    <div className="flex flex-col items-center gap-5">
+      <div className="relative aspect-square w-full max-w-[260px] overflow-hidden rounded-xl border border-border bg-card shadow-clay-card">
         {showSkeleton ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <Loader2 className="size-7 animate-spin text-primary" />
             <p className="text-xs text-muted-foreground">Gerando QR code...</p>
           </div>
         ) : (
@@ -161,8 +164,17 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
         ) : null}
       </div>
 
-      <div className="flex w-full items-center justify-between text-xs text-muted-foreground">
-        <span>
+      <div className="flex w-full items-center justify-between gap-3">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+            status === "awaiting_qr" && secondsLeft > 0
+              ? "bg-lemon-400/30 text-lemon-700 dark:bg-lemon-400/20 dark:text-lemon-400"
+              : status === "connected"
+                ? "bg-matcha-300/40 text-matcha-800 dark:bg-matcha-300/20 dark:text-matcha-300"
+                : "bg-muted text-muted-foreground",
+          )}
+        >
           {status === "awaiting_qr" && secondsLeft > 0
             ? `Expira em ${secondsLeft}s`
             : status === "connected"
@@ -181,10 +193,22 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
         </Button>
       </div>
 
-      <ol className="w-full space-y-1 text-xs text-muted-foreground">
-        <li>1. Abra o WhatsApp no seu celular.</li>
-        <li>2. Toque em Mais opções e em Aparelhos conectados.</li>
-        <li>3. Aponte a câmera para o QR code acima.</li>
+      <ol className="w-full flex flex-col gap-2.5 text-sm">
+        {[
+          "Abra o WhatsApp no seu celular.",
+          "Toque em Mais opções e em Aparelhos conectados.",
+          "Aponte a câmera para o QR code acima.",
+        ].map((step, i) => (
+          <li key={step} className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-matcha-300/40 text-xs font-semibold text-matcha-800 dark:bg-matcha-300/15 dark:text-matcha-300"
+            >
+              {i + 1}
+            </span>
+            <span className="text-muted-foreground pt-0.5">{step}</span>
+          </li>
+        ))}
       </ol>
     </div>
   );

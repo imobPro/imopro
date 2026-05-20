@@ -24,7 +24,10 @@
       "Bash(dir /b frontend\\\\*.json frontend\\\\*.lock)",
       "Bash(/c/Program Files/Git/bin/ls.exe *)",
       "Bash(/c/Program Files/nodejs/npm.cmd run *)",
-      "Bash(/c/Program Files/Git/bin/git.exe diff *)"
+      "Bash(/c/Program Files/Git/bin/git.exe diff *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000 :3333\")",
+      "Bash(powershell *)"
     ]
   }
 }

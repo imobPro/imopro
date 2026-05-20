@@ -44,6 +44,8 @@ export function VerifyEmailActions() {
     <div className="flex flex-col gap-3">
       <Button
         type="button"
+        variant="swatch"
+        size="clay"
         onClick={handleCheck}
         disabled={checkPending}
       >
@@ -52,7 +54,8 @@ export function VerifyEmailActions() {
 
       <Button
         type="button"
-        variant="outline"
+        variant="clay-secondary"
+        size="clay"
         onClick={handleResend}
         disabled={resendPending || cooldown > 0}
       >

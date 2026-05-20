@@ -45,14 +45,14 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh bg-background">
       <SidebarNav agentName={agent.name} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <MobileTopBar agentName={agent.name} />
         <TrialBanner />
         <NotificationBanner />
-        <main className="flex-1 min-w-0 pb-16 md:pb-0">{children}</main>
+        <main className="flex-1 min-w-0 pb-20 md:pb-0">{children}</main>
         <BottomTabs />
       </div>
     </div>

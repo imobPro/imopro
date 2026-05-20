@@ -1,24 +1,27 @@
-import Link from "next/link";
-import { Users } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 export const metadata = { title: "Caixa de entrada — ImobPro" };
 
 export default function InboxPage() {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 p-6 text-center min-h-[60dvh]">
-      <Users className="size-10 text-muted-foreground" />
-      <div className="space-y-1 max-w-sm">
-        <h1 className="text-lg font-semibold">Sua caixa de entrada</h1>
-        <p className="text-sm text-muted-foreground">
-          Selecione um lead na aba Leads para abrir a conversa.
-        </p>
+    <div className="hidden md:flex flex-1 items-center justify-center p-8">
+      <div className="flex flex-col items-center text-center gap-4 max-w-sm">
+        <span
+          aria-hidden
+          className="inline-flex size-16 items-center justify-center rounded-2xl bg-matcha-300/30 text-matcha-800 dark:bg-matcha-300/10 dark:text-matcha-300"
+        >
+          <MessageSquare className="size-7" />
+        </span>
+        <div className="flex flex-col gap-1.5">
+          <h1 className="font-display-tight text-2xl text-foreground">
+            Selecione uma conversa
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Escolha um lead na lista ao lado para abrir a conversa, ver
+            histórico e responder.
+          </p>
+        </div>
       </div>
-      <Link
-        href="/leads"
-        className="text-sm text-primary hover:underline underline-offset-2"
-      >
-        Ir para Leads →
-      </Link>
     </div>
   );
 }

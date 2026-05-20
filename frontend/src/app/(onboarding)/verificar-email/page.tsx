@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { Mail } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { signOutAction } from "@/app/login/actions";
 import { VerifyEmailActions } from "./verify-email-actions";
@@ -32,11 +31,11 @@ export default async function VerificarEmailPage() {
 
   return (
     <div className="flex flex-col gap-6 text-center">
-      <header className="flex flex-col items-center gap-3">
-        <div className="flex size-12 items-center justify-center rounded-full bg-primary/15 text-primary">
-          <Mail className="size-6" />
+      <header className="flex flex-col items-center gap-4">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-matcha-300/40 text-matcha-800 shadow-clay-card dark:bg-matcha-300/15 dark:text-matcha-300">
+          <Mail className="size-7" />
         </div>
-        <h1 className="font-display text-3xl md:text-4xl leading-tight text-foreground">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Confirme seu e-mail
         </h1>
         <p className="text-sm text-muted-foreground max-w-xs">
@@ -46,16 +45,14 @@ export default async function VerificarEmailPage() {
         </p>
       </header>
 
-      <Card>
-        <CardContent>
-          <VerifyEmailActions />
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-clay-card">
+        <VerifyEmailActions />
+      </div>
 
       <form action={signOutAction}>
         <button
           type="submit"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors duration-fast"
         >
           Sair desta conta
         </button>

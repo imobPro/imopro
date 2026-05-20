@@ -24,7 +24,7 @@ export default async function ReportsPage() {
   return (
     <div className="flex flex-col gap-5 p-4 md:p-6">
       <header className="flex flex-col gap-1">
-        <h1 className="font-display text-3xl md:text-4xl text-foreground">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Relatórios
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -36,7 +36,7 @@ export default async function ReportsPage() {
       {reports.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul className="flex flex-col divide-y rounded-xl border bg-card overflow-hidden">
+        <ul className="flex flex-col gap-2">
           {reports.map((r, i) => (
             <ReportItem key={r.id} report={r} index={i} />
           ))}
@@ -58,17 +58,22 @@ function ReportItem({ report, index }: { report: ReportRow; index: number }) {
   return (
     <li
       style={{ animationDelay: `${delay}ms` }}
-      className="flex items-center justify-between gap-3 px-4 py-3.5 group transition-colors hover:bg-muted/40 animate-in fade-in fill-mode-both duration-base ease-out-quart"
+      className="flex items-center justify-between gap-3 px-4 py-3.5 rounded-xl border border-border bg-card shadow-clay-card transition-all duration-fast ease-out-quart hover:-translate-y-0.5 hover:shadow-clay-soft animate-in fade-in fill-mode-both duration-base ease-out-quart"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <FileText className="size-5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+        <span
+          aria-hidden
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-matcha-300/40 text-matcha-800 dark:bg-matcha-300/15 dark:text-matcha-300"
+        >
+          <FileText className="size-5" />
+        </span>
         <div className="min-w-0">
-          <p className="truncate font-display text-lg text-foreground leading-tight">
+          <p className="truncate font-display text-base font-semibold text-foreground leading-tight">
             {report.periodType === "monthly"
               ? "Relatório mensal"
               : "Relatório semanal"}
           </p>
-          <p className="truncate text-xs text-muted-foreground tabular-nums">
+          <p className="truncate text-xs text-muted-foreground tabular-nums mt-0.5">
             {periodLabel} · {sentLabel}
           </p>
         </div>
@@ -76,7 +81,7 @@ function ReportItem({ report, index }: { report: ReportRow; index: number }) {
 
       <Link
         href={`/api/reports/${report.id}/download`}
-        className="inline-flex shrink-0 items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-all duration-fast ease-out-quart hover:brightness-95 active:scale-95"
+        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground shadow-clay-card transition-all duration-fast ease-out-quart hover:-rotate-2 hover:-translate-y-0.5 hover:shadow-clay-hard active:rotate-0 active:translate-y-0 active:shadow-none"
         prefetch={false}
       >
         <Download className="size-3.5" />
@@ -88,9 +93,14 @@ function ReportItem({ report, index }: { report: ReportRow; index: number }) {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border border-dashed bg-card py-16 px-6 text-center">
-      <FileText className="mx-auto size-8 text-muted-foreground" />
-      <h2 className="mt-4 font-display text-3xl text-foreground">
+    <div className="rounded-2xl border border-dashed border-border bg-card py-16 px-6 text-center">
+      <span
+        aria-hidden
+        className="inline-flex size-14 items-center justify-center rounded-2xl bg-matcha-300/40 text-matcha-800 dark:bg-matcha-300/15 dark:text-matcha-300"
+      >
+        <FileText className="size-7" />
+      </span>
+      <h2 className="mt-4 font-display-tight text-2xl text-foreground">
         Nenhum relatório ainda
       </h2>
       <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">

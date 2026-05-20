@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { SignupWizard } from "./signup-wizard";
 
 export const metadata = {
@@ -16,9 +15,13 @@ export default async function CadastroPage({
   const hint = plano === "imobiliaria" ? "imobiliaria" : "corretor";
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-10 md:py-14">
+    <div className="relative mx-auto w-full max-w-md px-4 py-10 md:py-14">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 [background:radial-gradient(60%_50%_at_50%_115%,oklch(0.52_0.13_156/0.10),transparent_70%)]"
+      />
       <header className="mb-6 flex flex-col items-center gap-2 text-center">
-        <h1 className="font-display text-3xl md:text-4xl leading-tight text-foreground">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Crie sua conta
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -26,11 +29,9 @@ export default async function CadastroPage({
         </p>
       </header>
 
-      <Card>
-        <CardContent>
-          <SignupWizard planoHint={hint} />
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-clay-card">
+        <SignupWizard planoHint={hint} />
+      </div>
     </div>
   );
 }

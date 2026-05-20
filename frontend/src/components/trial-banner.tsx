@@ -8,18 +8,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const variantClasses: Record<Exclude<BannerVariant, "hidden">, string> = {
-  neutral:
-    "border-b bg-muted/60 text-muted-foreground",
+  neutral: "border-b border-border bg-muted/60 text-muted-foreground",
   warning:
-    "border-b border-primary/40 bg-primary/10 text-foreground",
+    "border-b border-lemon-700/30 bg-lemon-400/20 text-foreground dark:bg-lemon-400/10",
   danger:
-    "border-b border-destructive/30 bg-destructive/10 text-foreground",
+    "border-b border-pomegranate-400/30 bg-pomegranate-400/10 text-foreground",
 };
 
 const ctaClasses: Record<Exclude<BannerVariant, "hidden">, string> = {
   neutral: "text-foreground hover:underline",
   warning: "text-foreground hover:underline",
-  danger: "text-destructive hover:underline",
+  danger: "text-pomegranate-400 hover:underline",
 };
 
 export async function TrialBanner() {

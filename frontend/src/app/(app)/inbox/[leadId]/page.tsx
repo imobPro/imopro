@@ -45,7 +45,7 @@ export default async function LeadConversationPage({
   await markAsViewedAction(leadId);
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-3rem)] md:h-dvh">
+    <div className="flex flex-col h-full">
       <ChatHeader lead={lead} />
       <ChatMessages messages={messages} expanded={isExpanded} />
     </div>

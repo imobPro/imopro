@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 
+// Paleta progressiva — frio (pomegranate) → quente (matcha). Score alto = lead pronto pra fechar.
 const SCORE_CLASS: Record<number, string> = {
   1: "bg-muted text-muted-foreground",
-  2: "bg-muted text-foreground/70",
-  3: "bg-primary/15 text-primary border border-primary/25",
-  4: "bg-primary/40 text-primary-foreground",
-  5: "bg-primary text-primary-foreground shadow-sm",
+  2: "bg-pomegranate-400/15 text-pomegranate-400 dark:bg-pomegranate-400/20",
+  3: "bg-lemon-400/30 text-lemon-700 dark:bg-lemon-400/20 dark:text-lemon-400",
+  4: "bg-matcha-300/40 text-matcha-800 dark:bg-matcha-300/25 dark:text-matcha-300",
+  5: "bg-matcha-600 text-primary-foreground shadow-clay-card",
 };
 
 export function ScoreBadge({

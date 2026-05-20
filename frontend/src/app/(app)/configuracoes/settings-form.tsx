@@ -97,7 +97,7 @@ export function SettingsForm({ tenant, visibility, myPhone }: Props) {
   return (
     <div className="flex flex-col gap-6">
       {/* Painel de visibilidade — preferência pessoal por agent */}
-      <section className="rounded-md border bg-card p-4">
+      <section className="rounded-xl border border-border bg-card p-4 shadow-clay-card">
         <h2 className="text-sm font-semibold">O que mostrar nesta tela</h2>
         <p className="mt-1 text-xs text-muted-foreground">
           Esconda seções que você não usa. A escolha vale só para você.
@@ -254,15 +254,15 @@ export function SettingsForm({ tenant, visibility, myPhone }: Props) {
         <p
           className={
             feedback?.type === "ok"
-              ? "text-xs text-emerald-600"
+              ? "text-xs text-primary font-medium"
               : feedback?.type === "error"
-                ? "text-xs text-destructive"
+                ? "text-xs text-pomegranate-400 font-medium"
                 : "text-xs text-muted-foreground"
           }
         >
           {feedback?.message ?? "Alterações são salvas ao clicar em Salvar."}
         </p>
-        <Button onClick={onSave} disabled={isPending}>
+        <Button variant="swatch" size="clay" onClick={onSave} disabled={isPending}>
           {isPending ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>
@@ -280,7 +280,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-2 rounded-md border bg-card p-4">
+    <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4 shadow-clay-card">
       <div>
         <h2 className="text-sm font-semibold">{title}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>

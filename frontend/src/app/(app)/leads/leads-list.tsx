@@ -129,25 +129,34 @@ export function LeadsList({
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
+      <header className="flex flex-col gap-1">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
+          Leads
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Lista completa dos leads que chegaram pelo WhatsApp. Toque num card
+          para abrir a conversa.
+        </p>
+      </header>
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar por nome, telefone ou bairro"
-              className="pl-8 h-9"
+              className="pl-9 h-10 rounded-lg shadow-clay-card"
             />
           </div>
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="clay-secondary"
+            size="default"
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
             aria-controls="leads-filters-panel"
-            className="h-9 shrink-0"
+            className="h-10 shrink-0"
           >
             <ListFilter />
             <span className="hidden sm:inline">Filtros</span>
@@ -221,8 +230,8 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-16 px-6 text-center">
-      <h2 className="font-display text-3xl text-foreground">{title}</h2>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 px-6 text-center">
+      <h2 className="font-display-tight text-2xl text-foreground">{title}</h2>
       <p className="text-sm text-muted-foreground max-w-sm">{body}</p>
       {action}
     </div>

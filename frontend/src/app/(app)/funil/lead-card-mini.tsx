@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
 import { ScoreBadge } from "@/components/ui/score-badge";
 import { cn } from "@/lib/utils";
 import { formatPhoneBR, formatRelative } from "@/lib/domain/relative-time";
@@ -11,16 +10,15 @@ export function LeadCardMini({ lead }: { lead: LeadWithConversation }) {
       href={`/inbox/${lead.id}`}
       className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl group"
     >
-      <Card
-        size="sm"
+      <div
         className={cn(
-          "gap-1.5 px-3 py-2.5",
+          "flex flex-col gap-1.5 rounded-xl border border-border bg-background px-3 py-2.5 text-sm",
           "transition-all duration-fast ease-out-quart",
-          "hover:-translate-y-px hover:shadow-sm hover:bg-muted/30",
+          "hover:-translate-y-0.5 hover:shadow-clay-soft hover:bg-card",
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium truncate">
+          <p className="text-sm font-medium truncate text-foreground">
             {lead.name?.trim() || "Sem nome"}
           </p>
           <ScoreBadge score={lead.score} className="size-5 text-[10px]" />
@@ -31,7 +29,7 @@ export function LeadCardMini({ lead }: { lead: LeadWithConversation }) {
             {formatRelative(lead.last_message_at)}
           </span>
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }

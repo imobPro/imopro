@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { ScoreBadge } from "@/components/ui/score-badge";
 import { cn } from "@/lib/utils";
 import {
   INTENT_META,
   SENTIMENT_META,
-  badgeVariantForTone,
 } from "@/lib/domain/lead-enums";
 import { formatPhoneBR, formatRelative, initialsFrom } from "@/lib/domain/relative-time";
-import type { LeadWithConversation, Sentiment } from "@/lib/types/database";
+import type {
+  IntentType,
+  LeadWithConversation,
+  Sentiment,
+} from "@/lib/types/database";
 
 function pickSentiment(lead: LeadWithConversation): Sentiment | null {
   const conv = lead.conversations?.[0];
@@ -22,6 +24,21 @@ function isUnread(lead: LeadWithConversation): boolean {
   if (!lead.last_viewed_at) return true;
   return lead.last_viewed_at < lead.last_message_at;
 }
+
+const SENTIMENT_BADGE: Record<Sentiment, "fechado" | "info" | "hot"> = {
+  positivo: "fechado",
+  neutro: "info",
+  negativo: "hot",
+};
+
+const INTENT_BADGE: Record<IntentType, "qualificado" | "visita" | "info"> = {
+  compra: "qualificado",
+  aluguel: "qualificado",
+  venda: "qualificado",
+  visita: "visita",
+  informacao: "info",
+  desconhecido: "info",
+};
 
 export function LeadCard({ lead }: { lead: LeadWithConversation }) {
   const sentiment = pickSentiment(lead);
@@ -36,28 +53,34 @@ export function LeadCard({ lead }: { lead: LeadWithConversation }) {
       href={`/inbox/${lead.id}`}
       className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl group"
     >
-      <Card
-        size="sm"
+      <div
         className={cn(
-          "flex-row items-center gap-3 px-3 py-3",
+          "flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-card",
           "transition-all duration-fast ease-out-quart",
-          "hover:-translate-y-px hover:shadow-sm hover:bg-muted/40",
+          "hover:-translate-y-0.5 hover:shadow-clay-soft",
         )}
       >
         <Avatar
           size="default"
           className={cn(
             "transition-shadow duration-base",
-            isHot && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
+            isHot && "ring-2 ring-pomegranate-400/40 ring-offset-2 ring-offset-card",
           )}
         >
-          <AvatarFallback className={cn(isHot && "bg-primary/15 text-primary")}>
+          <AvatarFallback
+            className={cn(
+              "rounded-xl font-semibold",
+              isHot
+                ? "bg-pomegranate-400/20 text-pomegranate-400"
+                : "bg-ube-300/40 text-ube-800 dark:bg-ube-300/15 dark:text-ube-300",
+            )}
+          >
             {initialsFrom(lead.name, lead.phone)}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm truncate flex items-center gap-1.5">
+          <p className="text-sm flex items-center gap-1.5">
             {unread && (
               <span
                 aria-label="Não lido"
@@ -68,33 +91,33 @@ export function LeadCard({ lead }: { lead: LeadWithConversation }) {
               {lead.name?.trim() || "Sem nome"}
             </span>
           </p>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
             <span className="font-mono">{formatPhoneBR(lead.phone)}</span>
             {lead.region ? ` · ${lead.region}` : ""}
           </p>
         </div>
 
         <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground tabular-nums">
               {formatRelative(lead.last_message_at)}
             </span>
             <ScoreBadge score={lead.score} />
           </div>
           <div className="flex flex-wrap justify-end gap-1">
-            {sentimentMeta && (
-              <Badge variant={badgeVariantForTone(sentimentMeta.tone)}>
+            {sentimentMeta && sentiment && (
+              <Badge variant={SENTIMENT_BADGE[sentiment]}>
                 {sentimentMeta.label}
               </Badge>
             )}
-            {intentMeta && (
-              <Badge variant={badgeVariantForTone(intentMeta.tone)}>
+            {intentMeta && lead.intent && (
+              <Badge variant={INTENT_BADGE[lead.intent]}>
                 {intentMeta.label}
               </Badge>
             )}
           </div>
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }

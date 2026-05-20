@@ -19,6 +19,13 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Estados de lead — paleta swatch Clay
+        hot: "bg-pomegranate-400/20 text-pomegranate-400 dark:bg-pomegranate-400/25 dark:text-pomegranate-400",
+        quente: "bg-pomegranate-400/20 text-pomegranate-400 dark:bg-pomegranate-400/25 dark:text-pomegranate-400",
+        qualificado: "bg-slushie-500/15 text-slushie-800 dark:bg-slushie-500/20 dark:text-slushie-500",
+        visita: "bg-lemon-400/30 text-lemon-700 dark:bg-lemon-400/20 dark:text-lemon-400",
+        fechado: "bg-matcha-300/40 text-matcha-800 dark:bg-matcha-300/20 dark:text-matcha-300",
+        info: "bg-ube-300/30 text-ube-800 dark:bg-ube-300/20 dark:text-ube-300",
       },
     },
     defaultVariants: {

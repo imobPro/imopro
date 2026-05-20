@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,30 +19,21 @@ export function ChatHeader({ lead }: { lead: LeadWithConversation }) {
   const isHotLead = (lead.score ?? 0) >= 4;
 
   return (
-    <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur-sm">
-      <div className="flex items-center gap-3 px-3 py-2 md:px-6 md:py-3">
-        <Link
-          href="/leads"
-          className={cn(
-            "md:hidden inline-flex items-center justify-center size-8 rounded-md",
-            "text-muted-foreground hover:bg-muted hover:text-foreground",
-            "transition-colors duration-fast",
-          )}
-          aria-label="Voltar para Leads"
-        >
-          <ArrowLeft className="size-4" />
-        </Link>
-
+    <header className="sticky top-0 z-10 border-b border-border bg-card">
+      <div className="flex items-center gap-3 px-4 py-3 md:px-6">
         <Avatar
           size="default"
           className={cn(
             "transition-shadow duration-base",
-            isHotLead && "ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
+            isHotLead && "ring-2 ring-primary/40 ring-offset-2 ring-offset-card",
           )}
         >
           <AvatarFallback
             className={cn(
-              isHotLead && "bg-primary/15 text-primary",
+              "rounded-xl font-semibold",
+              isHotLead
+                ? "bg-pomegranate-400/25 text-pomegranate-400"
+                : "bg-ube-300/40 text-ube-800 dark:bg-ube-300/15 dark:text-ube-300",
             )}
           >
             {initialsFrom(lead.name, lead.phone)}
@@ -51,12 +41,12 @@ export function ChatHeader({ lead }: { lead: LeadWithConversation }) {
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">
+          <p className="text-sm font-semibold truncate text-foreground">
             {lead.name?.trim() || "Sem nome"}
           </p>
-          <p className="text-xs text-muted-foreground truncate font-mono">
-            {formatPhoneBR(lead.phone)}
-            {lead.region ? <span className="font-sans"> · {lead.region}</span> : ""}
+          <p className="text-xs text-muted-foreground truncate">
+            <span className="font-mono">{formatPhoneBR(lead.phone)}</span>
+            {lead.region ? <span> · {lead.region}</span> : ""}
           </p>
         </div>
 

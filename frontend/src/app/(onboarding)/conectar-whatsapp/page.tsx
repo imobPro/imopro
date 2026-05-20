@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { fetchBackend } from "@/lib/backend";
-import { Card, CardContent } from "@/components/ui/card";
 import { QrDisplay } from "./qr-display";
 import type { ConnectionState } from "./actions";
 
@@ -30,8 +29,8 @@ export default async function ConectarWhatsappPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1 text-center">
-        <h1 className="font-display text-3xl md:text-4xl leading-tight text-foreground">
+      <header className="flex flex-col gap-2 text-center">
+        <h1 className="font-display-tight text-3xl md:text-4xl text-foreground">
           Conecte seu WhatsApp
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -40,14 +39,12 @@ export default async function ConectarWhatsappPage() {
         </p>
       </header>
 
-      <Card>
-        <CardContent>
-          <QrDisplay
-            initialStatus={initial.zapiStatus}
-            initialQrCode={initial.qrCode}
-          />
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-clay-card">
+        <QrDisplay
+          initialStatus={initial.zapiStatus}
+          initialQrCode={initial.qrCode}
+        />
+      </div>
 
       <p className="text-xs text-center text-muted-foreground">
         Seus 7 dias de trial começam quando a conexão for confirmada.

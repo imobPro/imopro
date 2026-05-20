@@ -30,12 +30,17 @@ export function MessageBubble({
           "animate-in fade-in slide-in-from-bottom-1 ease-out-quart fill-mode-both",
           "duration-[var(--duration-base)]",
           isAssistant
-            ? "bg-primary/12 border border-primary/20 text-foreground rounded-br-sm"
-            : "bg-muted text-foreground rounded-bl-sm",
+            ? "bg-primary text-primary-foreground rounded-br-sm shadow-clay-card"
+            : "bg-card border border-border text-foreground rounded-bl-sm shadow-clay-card",
         )}
       >
-        <MessageBody message={message} />
-        <span className="text-[10px] tabular-nums self-end text-muted-foreground">
+        <MessageBody message={message} isAssistant={isAssistant} />
+        <span
+          className={cn(
+            "text-[10px] tabular-nums self-end",
+            isAssistant ? "text-primary-foreground/70" : "text-muted-foreground",
+          )}
+        >
           {formatAbsoluteTime(message.created_at)}
         </span>
       </div>
@@ -43,7 +48,13 @@ export function MessageBubble({
   );
 }
 
-function MessageBody({ message }: { message: ChatMessage }) {
+function MessageBody({
+  message,
+  isAssistant,
+}: {
+  message: ChatMessage;
+  isAssistant: boolean;
+}) {
   switch (message.type) {
     case "image":
     case "sticker":
@@ -66,9 +77,16 @@ function MessageBody({ message }: { message: ChatMessage }) {
     case "audio":
       return (
         <div className="flex flex-col gap-1.5">
-          {message.media_url && <AudioPlayer src={message.media_url} />}
+          {message.media_url && (
+            <AudioPlayer src={message.media_url} isAssistant={isAssistant} />
+          )}
           {message.content && (
-            <p className="whitespace-pre-wrap break-words text-xs italic text-muted-foreground">
+            <p
+              className={cn(
+                "whitespace-pre-wrap break-words text-xs italic",
+                isAssistant ? "text-primary-foreground/80" : "text-muted-foreground",
+              )}
+            >
               {message.content}
             </p>
           )}
@@ -81,7 +99,10 @@ function MessageBody({ message }: { message: ChatMessage }) {
           href={message.media_url ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 text-primary underline-offset-2 hover:underline"
+          className={cn(
+            "inline-flex items-center gap-2 underline-offset-2 hover:underline",
+            isAssistant ? "text-primary-foreground" : "text-primary",
+          )}
         >
           <FileText className="size-4" />
           {message.content?.trim() || "Documento"}
@@ -91,7 +112,12 @@ function MessageBody({ message }: { message: ChatMessage }) {
     case "location":
       return (
         <div className="inline-flex items-center gap-2">
-          <MapPin className="size-4 text-primary" />
+          <MapPin
+            className={cn(
+              "size-4",
+              isAssistant ? "text-primary-foreground" : "text-primary",
+            )}
+          />
           <span>{message.content?.trim() || "Localização compartilhada"}</span>
         </div>
       );
@@ -106,7 +132,13 @@ function MessageBody({ message }: { message: ChatMessage }) {
   }
 }
 
-function AudioPlayer({ src }: { src: string }) {
+function AudioPlayer({
+  src,
+  isAssistant,
+}: {
+  src: string;
+  isAssistant: boolean;
+}) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -158,9 +190,11 @@ function AudioPlayer({ src }: { src: string }) {
         aria-label={playing ? "Pausar áudio" : "Tocar áudio"}
         className={cn(
           "inline-flex items-center justify-center size-8 shrink-0 rounded-full",
-          "bg-primary text-primary-foreground",
           "transition-transform duration-fast ease-out-quart",
           "hover:scale-105 active:scale-95",
+          isAssistant
+            ? "bg-primary-foreground text-primary"
+            : "bg-primary text-primary-foreground",
         )}
       >
         {playing ? (
@@ -170,13 +204,26 @@ function AudioPlayer({ src }: { src: string }) {
         )}
       </button>
       <div className="flex-1 flex items-center gap-2">
-        <div className="flex-1 h-1 rounded-full bg-foreground/10 overflow-hidden">
+        <div
+          className={cn(
+            "flex-1 h-1 rounded-full overflow-hidden",
+            isAssistant ? "bg-primary-foreground/30" : "bg-foreground/10",
+          )}
+        >
           <div
-            className="h-full bg-primary transition-[width] duration-100 ease-linear"
+            className={cn(
+              "h-full transition-[width] duration-100 ease-linear",
+              isAssistant ? "bg-primary-foreground" : "bg-primary",
+            )}
             style={{ width: `${progress * 100}%` }}
           />
         </div>
-        <span className="text-[10px] tabular-nums text-muted-foreground shrink-0">
+        <span
+          className={cn(
+            "text-[10px] tabular-nums shrink-0",
+            isAssistant ? "text-primary-foreground/70" : "text-muted-foreground",
+          )}
+        >
           {formatTime(duration ? (playing ? current : duration) : current)}
         </span>
       </div>

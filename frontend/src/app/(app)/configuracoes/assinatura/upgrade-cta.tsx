@@ -19,7 +19,7 @@ export function UpgradeCta({ email }: Props) {
 
   if (!hasWhatsapp && !hasEmail) {
     return (
-      <div className="rounded-md border bg-muted/40 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
         Em breve disponibilizaremos a ativação online. Por enquanto, entre em
         contato com a equipe ImobPro para liberar sua assinatura.
       </div>
@@ -33,7 +33,7 @@ export function UpgradeCta({ email }: Props) {
           href={`https://wa.me/${whatsappRaw}?text=${encodeURIComponent(message)}`}
           target="_blank"
           rel="noopener noreferrer"
-          className={cn(buttonVariants({ variant: "default" }), "flex-1")}
+          className={cn(buttonVariants({ variant: "swatch", size: "clay" }), "flex-1")}
         >
           <MessageCircle className="size-4" />
           Falar no WhatsApp
@@ -43,7 +43,7 @@ export function UpgradeCta({ email }: Props) {
       {hasEmail ? (
         <a
           href={`mailto:${supportEmail}?subject=${encodeURIComponent("Ativar assinatura ImobPro")}&body=${encodeURIComponent(message)}`}
-          className={cn(buttonVariants({ variant: "outline" }), "flex-1")}
+          className={cn(buttonVariants({ variant: "clay-secondary", size: "clay" }), "flex-1")}
         >
           <Mail className="size-4" />
           Enviar e-mail
