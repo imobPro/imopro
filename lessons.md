@@ -209,4 +209,14 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-05-22] — Middleware do Next 16 silenciosamente ignorado quando fora do `src/`
+
+**Contexto:** `frontend/middleware.ts` foi criado no diretório raiz do projeto Next, mas o frontend usa estrutura `src/app/`. Em Next 15 isso ainda funcionava; em Next 16 com Turbopack o arquivo é silenciosamente ignorado, sem warning no dev server.
+**O que estava errado:** Toda a lógica de redirect (`anônimo → /login`, `logado → /inbox` em rotas públicas) ficou inerte por semanas. Usuário logado conseguia ver `/precos`, `/cadastro`, etc. A defesa em profundidade em `(app)/layout.tsx` mascarou o sintoma para rotas autenticadas — o `if (!user) redirect("/login")` cobria o caso anônimo, então `/inbox` etc. continuaram protegidos. Só o redirect inverso (logged-in user em rotas públicas) ficou exposto. Bug #4 do roteiro de validação 9.4.
+**Como achei:** Adicionei `console.log` no middleware e observei que NENHUMA request gerava log, nem `/inbox` nem `/precos`. Aí lembrei: Next 16 prefere `proxy.ts` (ou `src/proxy.ts`); a localização raiz só vale se NÃO existir `src/`.
+**O que foi corrigido:** Movido para `src/middleware.ts` (passou a rodar, com warning de deprecação) e então migrado para `src/proxy.ts` com função `proxy` (convenção do Next 16). Helper interno (`src/lib/supabase/middleware.ts`) continua com nome `updateSession` — só o entry-point muda.
+**Regra para não repetir:** Em Next 16+, sempre colocar o entry-point de proxy/middleware dentro de `src/` quando o projeto usa `src/`. Preferir `proxy.ts` (a nova convenção) em projetos novos. Quando adicionar lógica de auth gating, instrumentar com `console.log` na primeira request pra confirmar que o middleware está sendo invocado — silêncio do dev server NÃO significa que está funcionando.
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

@@ -36,6 +36,204 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-22] — Bugs do roteiro 9.4 corrigidos + migração proxy.ts (Next 16)
+
+**Fase:** Fase 3 — pós-MVP (correção de bugs encontrados na validação)
+**Duração:** ~1 sessão
+
+### O que foi feito
+
+**5 bugs corrigidos** (todos validados via Playwright MCP):
+
+- **#1 e #2** — `frontend/src/app/(marketing)/cadastro/signup-wizard.tsx`: HTML5 validation (`required`/`type=email` + checkbox `required` no LGPD) sobrepunha os toasts custom em PT. Adicionado `noValidate` nos 3 `<form>` do wizard. Atributos semânticos (`required`, `type="email"`) mantidos para acessibilidade; validação JS já cobre os mesmos casos com mensagens em português.
+- **#4** — Middleware do Next 16 silenciosamente ignorado quando em `frontend/middleware.ts` (raiz). Causa só achada após instrumentar com `console.log` e ver que NENHUMA request gerava log. Movido para `frontend/src/middleware.ts` (passou a rodar com warning de deprecação), depois migrado para a nova convenção do Next 16: `frontend/src/proxy.ts` com função `proxy`. Helper `src/lib/supabase/middleware.ts` (função `updateSession`) ficou como está — é módulo interno, não entry-point.
+- **#5** — `frontend/src/lib/backend.ts`: `fetchBackend` sem try/catch ao redor do `fetch`. Backend offline → `TypeError: fetch failed` propagava pro Server Component e quebrava a árvore. Envolvido em try/catch, erro de rede vira `{ ok: false, error: { status: 0, code: "NETWORK_ERROR", ... } }`. Todos os callers já tratavam `!result.ok` — `TrialBanner` retorna `null` graciosamente, `assinatura/page.tsx` mostra fallback, painel continua acessível.
+- **#6 (encontrado em sweep adicional)** — `frontend/src/components/shell/theme-toggle.tsx`: hydration mismatch porque `useTheme()` retornava `resolvedTheme=undefined` no SSR (next-themes resolve no cliente). Aplicado o padrão `mounted` state — antes do mount ambos servidor/cliente renderizam com `isDark=false`; após mount, useEffect re-renderiza com o tema real. `suppressHydrationWarning` defensivo nos ícones.
+
+(Bug #3 já fixado em `onboarding.service.ts` na sessão de 2026-05-20 com `email_confirm: true`.)
+
+**Sweep adicional via Playwright MCP** validou (sem novos bugs):
+- Dark mode toggle funciona; troca classes `light`/`dark` no `<html>`, persiste em localStorage
+- Mobile resize (390x844): layout adapta, bottom-tabs funciona, sidebar esconde
+- `/privacidade` e `/termos` renderizam OK
+- `/login` com credenciais erradas mostra erro raw em dev (intencional, `signInAction` comuta para mensagem genérica PT em produção)
+- Cadastro completo e2e modo imobiliária: signup → signInWithPassword → /verificar-email (passagem instantânea) → /conectar-whatsapp
+- EMAIL_IN_USE retorna toast PT + volta pro Step 1 preservando os dados
+- Console 0 errors em todas as telas internas após o fix do #6
+
+**Lição registrada** em `lessons.md` ([2026-05-22]): em Next 16+ com `src/`, o entry-point de proxy/middleware tem que ficar em `src/proxy.ts`. Raiz é silenciosamente ignorada (sem warning). Sempre instrumentar com `console.log` para confirmar que está rodando — silêncio do dev server não significa sucesso.
+
+### Arquivos modificados
+- `frontend/src/app/(marketing)/cadastro/signup-wizard.tsx` — `noValidate` em 3 forms
+- `frontend/src/lib/backend.ts` — try/catch ao redor do fetch
+- `frontend/src/components/shell/theme-toggle.tsx` — mounted state + suppressHydrationWarning
+- `frontend/src/proxy.ts` (novo) — entry-point Next 16
+- `frontend/middleware.ts` (removido)
+- `src/modules/onboarding/onboarding.service.ts` — `email_confirm: true` (do dia 20, sem commit)
+- `docs/roteiro-validacao-9.4.md` — bugs #1-#6 marcados como corrigidos, resumo atualizado
+- `lessons.md` — entrada [2026-05-22]
+- Memória auto: `feedback_nextjs_proxy_location.md` adicionada ao MEMORY.md
+
+### Decisões tomadas
+- **Migrar pra `proxy.ts` em vez de só mover `middleware.ts`** — Next 16 emite deprecation warning em `middleware.ts`. Já que era pra mover o arquivo de qualquer forma, fazer a migração completa de uma vez evita ter que repetir no próximo upgrade.
+- **`noValidate` em vez de remover `required`/`type=email`** — atributos semânticos têm valor para AT (screen readers, formulários auto-fill). `noValidate` desliga só o comportamento de tooltip nativo bloqueante. Validação JS em PT continua sendo a fonte da verdade.
+- **`mounted` + `suppressHydrationWarning` (belt-and-suspenders) em vez de retornar `null` antes do mount** — retornar null causa CLS visual (botão some/aparece). A combinação do estado `mounted` (garante classes idênticas no primeiro render) + `suppressHydrationWarning` (defensivo contra qualquer diferença residual) mantém o layout estável.
+
+### Estado dos testes e build
+- Frontend: `tsc --noEmit` limpo. Console 0 errors em todas as rotas internas validadas via Playwright.
+- Backend: 213 testes do Vitest continuam passando (nenhuma mudança no backend nesta sessão além do fix do #3, que já tinha typecheck OK).
+
+### Pendências para próxima sessão
+- [ ] Avaliar se as screenshots `s*.png` da raiz devem ir pro `.gitignore` ou ser organizadas em `docs/screenshots/`
+- [ ] Decidir caminho da versão mobile (PWA / Capacitor / React Native) — não é prioridade pré-cliente
+- [ ] Configurar `SENTRY_DSN`, `BACKEND_PUBLIC_URL`, `ZAPI_ACCOUNT_TOKEN` no Railway antes do deploy
+
+---
+
+## [2026-05-20] — Redesign Clay + logo HomeMark + MCPs de validação
+
+**Fase:** Fase 3 — pós-MVP (polimento visual)
+**Duração:** ~1 sessão
+
+### O que foi feito
+
+**Redesign Clay no frontend** (commit `0395b64`, 52 arquivos, +4242/-515)
+- Linguagem visual Clay aplicada em todo o painel: paleta cream/matcha (verde), cantos generosos, sombras suaves. `globals.css` reescrito com novos tokens; UI base (`button`, `card`, `badge`, `tabs`, `score-badge`) atualizada com variantes alinhadas
+- Telas refeitas com o novo visual: marketing (`/precos`, `/cadastro`, header, footer), onboarding (`/verificar-email`, `/conectar-whatsapp`, layout), painel (`/configuracoes`, `/configuracoes/assinatura`, `/leads`, `/funil`, `/metricas`, `/relatorios`, `/inbox`, `TrialBanner`) e `/login`
+- Inbox ganha **split-view** (`conversations-list` + `inbox-layout-shell` + `layout` do route group) em vez da lista linear anterior, aproximando o uso da experiência de WhatsApp Web
+- Docs de referência de design versionados em `docs/imobpro-clay.md` e `docs/imobpro-android.md` (Android é referência para a versão mobile pós-MVP, não implementada)
+
+**Logo HomeMark centralizada**
+- Novo componente `frontend/src/components/brand/home-mark.tsx`: casa minimalista em outline branco sobre fundo verde (matcha), fiel à referência do Arthur (telhado com overhang, paredes sem chão, porta em "n" alto deslocada à direita)
+- Mesmo desenho usado em light e dark mode; cor branca fixa por preferência explícita do Arthur (não usa `text-primary-foreground` que mudaria com o tema)
+- Substitui o SVG duplicado de casa em 4 lugares: `public-header.tsx`, `sidebar-nav.tsx`, `mobile-top-bar.tsx`, `login/page.tsx`. Cada chamador passa apenas `containerClassName` e `iconClassName` (sem variações de cor)
+
+**Infraestrutura — MCPs instalados**
+- Playwright MCP (`@playwright/mcp@latest`) e Chrome DevTools MCP (`chrome-devtools-mcp@latest`) adicionados em scope `user` (`~/.claude.json`), via `claude mcp add ... --scope user`. Habilitam validação automática de UI no browser e inspeção do console — agora possível rodar o roteiro de validação 9.4 sem trabalho manual
+- `docs/mcps-desenvolvimento-instrucao.txt` reescrito (era um doc desatualizado de instalação, virou referência rápida do que está ativo e como instalar/atualizar)
+
+### Arquivos criados ou modificados (destaques)
+- `frontend/src/components/brand/home-mark.tsx` (novo)
+- `frontend/src/app/(app)/inbox/{layout,conversations-list,inbox-layout-shell}.tsx` (novos)
+- `frontend/src/app/globals.css` — paleta Clay
+- 45 telas/componentes do frontend tocados pelo redesign (ver `git show 0395b64 --stat`)
+- `docs/imobpro-clay.md`, `docs/imobpro-android.md` (referências de design)
+- `docs/mcps-desenvolvimento-instrucao.txt` (reescrito)
+- `.claude/settings.local.json` — novas permissões usadas na sessão (`netstat`, `findstr`, `powershell`)
+
+### Decisões tomadas
+- **Logo branca fixa em ambos os temas, não `primary-foreground`**: no tema escuro o `primary-foreground` é verde quase preto, o que daria contraste ruim no fundo verde. Arthur pediu explicitamente branco em light e dark
+- **Centralizar a logo em vez de editar 4 SVGs idênticos**: 4 arquivos duplicavam o SVG anterior. O componente `HomeMark` evita ter que editar em N lugares no próximo ajuste — não é abstração prematura, é deduplicação
+- **MCPs em scope `user`**: Playwright e Chrome DevTools são utilities genéricos que valem pra qualquer projeto frontend do Arthur, não só ImobPro. Scope `project` (commitado em `.mcp.json`) faria sentido se houvesse outros devs no repo
+- **`docs/imobpro-android.md` é referência visual, não plano técnico**: nada de mobile nativo foi planejado. Hoje o painel é Next.js mobile-first responsivo. Quando virar PWA/Capacitor/React Native, o doc serve de norte de design (Material 3 vs Clay)
+
+### Pendências para próxima sessão
+- [ ] **Reiniciar a sessão do Claude Code** para que as ferramentas dos MCPs novos (`mcp__playwright__*`, `mcp__chrome-devtools__*`) fiquem disponíveis
+- [ ] Rodar o roteiro `docs/roteiro-validacao-9.4.md` no browser usando Playwright MCP (~70 itens)
+- [ ] Decidir caminho da versão mobile (PWA / Capacitor / React Native) — não é prioridade pré-cliente
+
+---
+
+## [2026-05-16] — Sprint 9.4 — Observabilidade Sentry + roteiro de validação
+
+**Fase:** Fase 3 — Onboarding self-service (sub-sprint 4 de 4 do MVP)
+**Duração:** ~1 sessão
+
+### O que foi feito
+- **`@sentry/node` instalado** no backend. `src/instrument.ts` é o 1º import de `src/index.ts` (carrega dotenv + `Sentry.init` se `SENTRY_DSN` setado). Sem `tracesSampleRate` (tracing desligado, só errors). `sendDefaultPii: false` (LGPD-friendly), `attachStacktrace: true`. Boot loga `[Sentry] Inicializado...` ou `...desabilitado`
+- **Express:** `Sentry.setupExpressErrorHandler(app)` antes do `errorHandler` customizado — Sentry pega o stacktrace original, errorHandler devolve o JSON consistente
+- **Helpers em `src/shared/observability/sentry.ts`:**
+  - `captureSilentError(error, ctx)` — preserva `console.error` + reporta ao Sentry com tags (`module`, `operation`, `tenant_id`) e contexts (lead, conversation, extra). Usado nos catches que retornavam default
+  - `addExternalCallBreadcrumb({ service, operation, data })` — categoria `external.<service>`, level info. Aparece como pegada antes do erro
+  - `withJobMonitoring(ctx, fn)` — wrapper opcional para jobs BullMQ (não usado ainda; o `worker.on('failed')` cobre o whatsapp/billing/reports)
+- **Lição 018** (erros do Supabase engolidos) coberta em `leads.service.ts`: `scoreUp` fallback, `getConversationStats`, `getConversationHistory.rpc`, `updateConversationSentiment`, `persistAiFailure`, `flagInactiveLeadsAllTenants` (listTenants + per-tenant). **Lição 019**: `AgentLookupError` no middleware `auth.ts` virou evento Sentry antes de devolver 500
+- **Workers BullMQ + crons:** `whatsapp.worker.ts`, `billing.cron.ts`, `reports.cron.ts` — `on('failed')` reporta com tags `queue/job_name/job_id/tenant_id`, `on('error')` com `kind=worker_error`
+- **Breadcrumbs:** `sendTextOnce` (Z-API) + `generateResponse` (Anthropic) + `transcribeAudio` (OpenAI). Cobre os 3 serviços externos críticos
+- **`validate-env`:** `SENTRY_DSN` em `OPTIONAL_VARS` (warning no boot quando ausente). `.env.example` documenta `SENTRY_DSN` + `SENTRY_ENVIRONMENT` (default = `NODE_ENV`)
+- **Roteiro de validação manual** em `docs/roteiro-validacao-9.4.md`: 11 seções com ~70 itens (marketing, wizard 1-3, e-mail duplicado, verificação, QR, painel, banner trial em 7 estados via SQL, edge cases, Sentry opcional). Inclui template pra registrar bugs no fim
+
+### Arquivos criados ou modificados
+- `src/instrument.ts` (novo) — inicialização do Sentry
+- `src/shared/observability/sentry.ts` (novo) — helpers
+- `src/index.ts` — `setupExpressErrorHandler` antes do `errorHandler`
+- `src/modules/leads/leads.service.ts` — `captureSilentError` nos catches que retornavam default (lição 018)
+- `src/shared/middleware/auth.ts` — `AgentLookupError` reportado antes do 500 (lição 019)
+- `src/modules/whatsapp/whatsapp.worker.ts`, `src/modules/billing/billing.cron.ts`, `src/modules/reports/reports.cron.ts` — `on('failed')` + `on('error')`
+- `src/modules/whatsapp/whatsapp.service.ts`, `src/modules/ai-engine/ai-engine.service.ts` — breadcrumbs nos chamadores externos
+- `src/shared/utils/validate-env.ts` — `SENTRY_DSN` em OPTIONAL_VARS
+- `.env.example` — documenta `SENTRY_DSN` e `SENTRY_ENVIRONMENT`
+- `docs/roteiro-validacao-9.4.md` (novo)
+
+### Decisões tomadas
+- **Sem `tracesSampleRate` no MVP**: tracing custa cota Sentry e dobra a complexidade de leitura dos eventos. Errors only por ora; ativar tracing se aparecer dor real de performance
+- **`sendDefaultPii: false`**: o produto lida com conversas de leads (dados pessoais sob LGPD). Sentry não pode capturar request bodies, cookies ou IPs automaticamente. PII vai por tag/context controlado
+- **Cobrir lição 018 com helper em vez de `throw`**: o catch silencioso existia por design (atendimento não pode cair). O `captureSilentError` mantém o comportamento + ganha visibilidade. Não muda o fluxo, só revela o que estava escondido
+- **Validação manual em vez de testes E2E**: 213 testes unitários já cobrem regras de negócio. Fluxos de onboarding tocam Supabase Auth + Z-API real — não dá pra mockar bem. Roteiro manual com checkbox é mais honesto pré-cliente
+
+### Pendências para próxima sessão
+- [ ] Validar o roteiro `docs/roteiro-validacao-9.4.md` no browser (~70 itens). Agora possível com Playwright MCP
+- [ ] Configurar `SENTRY_DSN` no Railway antes do deploy
+- [ ] Backlog técnico ainda em aberto: prompt caching no Anthropic SDK quando system prompt > 1024 tokens, avaliar `gpt-4o-mini-transcribe` vs Whisper para PT-BR (depende de áudios reais)
+
+### Estado dos testes
+- 213 testes passando (sem adições — Sentry é integração ambiente-dependente, validação fica no roteiro manual)
+- `tsc --noEmit` limpo
+
+---
+
+## [2026-05-16] — Sprint 9.3 — Frontend público + interno + billing UI
+
+**Fase:** Fase 3 — Onboarding self-service (sub-sprint 3 de 4 do MVP)
+**Duração:** ~1 sessão
+
+### O que foi feito
+
+**Frente pública** (route group `(marketing)` com `PublicHeader` + `PublicFooter`)
+- `/precos` — 2 cards lado a lado (Corretor R$297 / Imobiliária R$597), badge "7 dias grátis", CTA → `/cadastro?plano=...`
+- `/cadastro` — wizard de 3 telas com state local + `signupAction` → backend; ao final faz `signInWithPassword` + `auth.resend` + push `/verificar-email`
+- `/privacidade` e `/termos` — leem `docs/privacidade.md`/`docs/termos.md` via `react-markdown` (componentes customizados, sem `@tailwindcss/typography`)
+
+**Frente onboarding** (route group `(onboarding)`, sem shell do painel)
+- `/verificar-email` — tela cheia bloqueante com ícone, e-mail mascarado, botão "Já confirmei" com `refreshSession`+`getUser`, botão "Reenviar" com cooldown 60s
+- `/conectar-whatsapp` — Server Component chama `/api/onboarding/connection`, redirect `/inbox` se `connected`, redirect `/verificar-email` se 403; `QrDisplay` client com provisionamento automático no mount, contador 45s, polling 2.5s via `pollConnectionAction`, botão "Gerar novo" quando expira, tela de erro com "Tentar novamente" sem suporte/detalhes
+
+**Frente interna** (route group `(app)`)
+- `/configuracoes/assinatura` — Server Component carrega `/api/subscription` + `/api/me` em paralelo; renderiza 4 estados (trial pendente sem WhatsApp, trial ativo com métricas, expirado/cancelado com CTA, ativo com `planId`+data); `UpgradeCta` lê `NEXT_PUBLIC_SUPPORT_WHATSAPP`/`NEXT_PUBLIC_SUPPORT_EMAIL`, esconde botões se vars vazias (fallback neutro, sem CTA fantasma) — `wa.me`/`mailto:` com mensagem pré-preenchida com e-mail do cliente
+- `TrialBanner` global Server Component em `(app)/layout.tsx` antes do `NotificationBanner`: lê `/api/subscription`, render condicional pelo `toBannerVariant` (neutral muted, warning âmbar com primary/10, danger destructive/10), some quando `status=active`, link contextual `/conectar-whatsapp` ou `/configuracoes/assinatura`
+- **Gate de e-mail confirmado** em `(app)/layout.tsx`: `if (!user.email_confirmed_at) redirect("/verificar-email")`. Quem ainda não confirmou nunca cai no painel
+
+**Middleware e libs**
+- `PUBLIC_PATHS = ["/login", "/cadastro", "/precos", "/privacidade", "/termos"]` + `/` público; `REDIRECT_WHEN_LOGGED_IN = ["/", "/login", "/cadastro", "/precos"]` (privacidade/termos lê logado ou não). `/` anônimo → `/precos` (landing); `/` logado → `/inbox`
+- `frontend/src/lib/backend.ts` — `fetchBackend<T>` wrapper com Bearer JWT da sessão, retorna `BackendResult<T>` discriminado
+- `frontend/src/lib/subscription.ts` — tipos `SubscriptionView`/`SubscriptionResponse`, `toBannerVariant` que centraliza a regra (hidden/neutral/warning/danger)
+
+### Arquivos criados ou modificados
+- `frontend/src/app/(marketing)/{precos,cadastro,privacidade,termos}/page.tsx` + `signup-wizard.tsx`
+- `frontend/src/app/(onboarding)/{verificar-email,conectar-whatsapp}/page.tsx` + actions/QR display
+- `frontend/src/app/(app)/configuracoes/assinatura/{page,upgrade-cta}.tsx`
+- `frontend/src/components/{marketing/{public-header,public-footer},trial-banner}.tsx`
+- `frontend/src/app/(app)/layout.tsx` — `TrialBanner` + gate de e-mail
+- `frontend/src/middleware.ts` — `PUBLIC_PATHS` e `REDIRECT_WHEN_LOGGED_IN` expandidos
+- `frontend/src/lib/{backend,subscription}.ts` (novos)
+- `frontend/.env.local.example` — `NEXT_PUBLIC_SUPPORT_WHATSAPP` e `NEXT_PUBLIC_SUPPORT_EMAIL` (vazias no piloto)
+- `frontend/package.json` — `react-markdown` adicionado (78 pacotes novos)
+
+### Decisões tomadas
+- **Wizard com state local em vez de URL state**: 3 telas pequenas, sem deep-link relevante. URL fica `?plano=corretor` só pra continuar a intenção da `/precos`
+- **`auth.resend` no cliente, não no backend**: usa o sender embutido do Supabase. Quando houver domínio + Resend, troca para template próprio
+- **`UpgradeCta` esconde botões se as envs estão vazias**: melhor UX silenciosa do que CTA que abre WhatsApp inexistente. Quando o ImobPro tiver canal comercial real, basta preencher as envs no Vercel
+- **`react-markdown` em vez de `@tailwindcss/typography`**: o plugin tipográfico arrasta um conjunto enorme de CSS para 2 telas estáticas. Componentes customizados deram o controle fino que o tema Clay precisa
+- **Validação visual fica como roteiro manual** (Sprint 9.4) — sem testes Vitest no frontend ainda
+
+### Pendências para próxima sessão (Sprint 9.4)
+- [ ] Sentry + roteiro de validação manual no browser (responsabilidade do Arthur)
+- [ ] Backlog técnico (prompt caching, transcrição)
+
+### Estado dos testes
+- 213 testes do backend continuam passando. Typecheck e ESLint do frontend passam
+
+---
+
 ## [2026-05-11] — Sprint 9.2 — Onboarding backend + provisionamento Z-API
 
 **Fase:** Fase 3 — Onboarding self-service (sub-sprint 2 de 3)

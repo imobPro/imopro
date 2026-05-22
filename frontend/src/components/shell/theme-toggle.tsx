@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,12 @@ type Props = {
 
 export function ThemeToggle({ className }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  // next-themes resolve o tema no cliente (localStorage/system). No SSR
+  // `resolvedTheme` é undefined — renderizar os ícones com a classe final só
+  // depois do mount evita hydration mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const isDark = mounted && resolvedTheme === "dark";
 
   const handleClick = () => {
     setTheme(isDark ? "light" : "dark");
@@ -28,8 +34,10 @@ export function ThemeToggle({ className }: Props) {
         "transition-colors duration-fast",
         className,
       )}
+      suppressHydrationWarning
     >
       <Sun
+        suppressHydrationWarning
         className={cn(
           "absolute size-4 transition-all duration-base ease-out-quart",
           isDark
@@ -38,6 +46,7 @@ export function ThemeToggle({ className }: Props) {
         )}
       />
       <Moon
+        suppressHydrationWarning
         className={cn(
           "absolute size-4 transition-all duration-base ease-out-quart",
           isDark

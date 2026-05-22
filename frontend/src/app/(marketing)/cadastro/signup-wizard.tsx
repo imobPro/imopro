@@ -220,6 +220,7 @@ function Step1({
         e.preventDefault();
         onNext();
       }}
+      noValidate
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-1.5">
@@ -296,6 +297,7 @@ function Step2({
         e.preventDefault();
         onNext();
       }}
+      noValidate
       className="flex flex-col gap-4"
     >
       <div className="flex flex-col gap-2">
@@ -428,6 +430,7 @@ function Step3({
         e.preventDefault();
         onSubmit();
       }}
+      noValidate
       className="flex flex-col gap-4"
     >
       <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm">

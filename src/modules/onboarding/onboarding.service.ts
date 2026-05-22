@@ -40,11 +40,13 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     throw new HttpError(400, 'INVALID_FIELD', 'Nome da imobiliária é obrigatório')
   }
 
-  // 1. Usuário no Auth — email_confirm:false: o gate de provisionamento exige confirmação
+  // 1. Usuário no Auth — email_confirm:true para o cliente conseguir logar imediato
+  // e ver o painel sem barreira (PLAN.md / decisão 2026-05-11). A defesa anti-bot
+  // fica no rate limit do endpoint e no aceite LGPD obrigatório.
   const { data: created, error: createErr } = await supabase.auth.admin.createUser({
     email,
     password: input.password,
-    email_confirm: false,
+    email_confirm: true,
   })
 
   if (createErr || !created?.user) {

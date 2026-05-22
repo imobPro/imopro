@@ -50,12 +50,29 @@ export async function fetchBackend<T>(
   }
 
   const backendUrl = process.env.BACKEND_URL ?? DEFAULT_BACKEND_URL;
-  const res = await fetch(`${backendUrl}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${backendUrl}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache,
+    });
+  } catch (err) {
+    // Backend offline / DNS / TLS: não derruba o Server Component.
+    // Cada caller já trata !result.ok (banner some, página mostra estado vazio).
+    return {
+      ok: false,
+      error: {
+        status: 0,
+        code: "NETWORK_ERROR",
+        message:
+          err instanceof Error
+            ? `Falha ao contatar o backend: ${err.message}`
+            : "Falha ao contatar o backend.",
+      },
+    };
+  }
 
   if (!res.ok) {
     type ErrorBody = { error?: { code?: string; message?: string } };

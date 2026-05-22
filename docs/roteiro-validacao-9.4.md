@@ -83,6 +83,9 @@ Use este roteiro pra validar o onboarding self-service + billing antes do 1º pi
 
 ## 6. Verificação de e-mail
 
+> **Obsoleto após fix do Bug #3** (2026-05-20): com `email_confirm:true` no backend, os novos cadastros já vêm confirmados — `/verificar-email` vira passagem instantânea (`page.tsx:28` redireciona pra `/conectar-whatsapp`). A tela continua no código mas só é acessível se algum usuário ficar com `email_confirmed_at = null` manualmente (admin desconfirmando, ou se a regra de produto mudar de novo). Os passos 6.1–6.8 ficam preservados como documentação de comportamento; revalidar quando o gate de e-mail voltar.
+
+
 | # | Passo | Esperado |
 |---|---|---|
 | 6.1 | Tela `/verificar-email`: e-mail mascarado correto? | Ex.: `ar***@gmail.com` |
@@ -178,3 +181,58 @@ Criar projeto Node.js em [sentry.io](https://sentry.io) (free tier, 5k errors/m�
 > ```
 
 <!-- Anote aqui conforme aparecerem -->
+
+> **Resumo da validação (2026-05-20, via Playwright MCP; atualizado 2026-05-22)**
+> 6 bugs encontrados (5 do roteiro original + 1 do sweep adicional de 2026-05-22). **Todos corrigidos** (#1, #2, #3 ainda na sessão de 2026-05-20; #4, #5, #6 em 2026-05-22). Seções 1, 3, 5, 8, 9 passaram limpas. Seção 6 ficou obsoleta após o fix do #3. Seções 2, 4, 7, 10 passaram com bugs anotados. Sweep adicional cobriu: dark mode toggle (funciona), mobile resize (layout adapta), `/privacidade` e `/termos` (renderizam OK), login com credenciais erradas (mensagem dev vs prod intencional), cadastro completo e2e modo imobiliária (criação → login → /conectar-whatsapp pulando /verificar-email), EMAIL_IN_USE (toast PT + retorna Step 1 com dados preservados). Estado pós-validação: 6 users de teste no Supabase Auth (`arthur.cg12+teste1..6@gmail.com`); `.env.local` do frontend ganhou `NEXT_PUBLIC_SUPPORT_WHATSAPP=5521999999999` e `NEXT_PUBLIC_SUPPORT_EMAIL=suporte@imobpro.com.br` (Arthur pode limpar); tenant `ed55b319-618a-4919-a12a-94720bcb2e92` está em `status='trial', trial_started_at=NULL` após revert do 9.7 (mas `zapi_status='connected'`); tenant novo do teste6 (modo imobiliária) criado com sucesso.
+
+### Bug #1 — Validação HTML5 sobrepõe toasts custom no Step 1 do wizard ✅ CORRIGIDO
+**Onde:** `/cadastro` — tela 1 do wizard (`frontend/src/app/(marketing)/cadastro/signup-wizard.tsx:229-269`)
+**Esperado:** Ao clicar "Continuar" com campos vazios/inválidos, ver toast custom — "Informe seu nome completo.", "Informe um e-mail válido.", etc. (itens 2.1, 2.2 do roteiro).
+**Aconteceu:** Os `<Input>` têm `required` HTML5 + o de e-mail é `type="email"`. O browser dispara tooltip nativo "Preencha este campo." / "Inclua um '@' no endereço de e-mail." e bloqueia o submit antes do `onSubmit` rodar. O `handleNext` nunca é chamado, o toast custom nunca aparece.
+**Repro:** abrir `/cadastro`, clicar "Continuar" sem preencher nada → aparece tooltip nativo do Chrome focado no `#fullName`, não o toast.
+**Correção aplicada (2026-05-22):** `noValidate` adicionado nos `<form>` dos 3 steps do `signup-wizard.tsx`. `required` e `type="email"` ficam (semântica/AT), browser não bloqueia mais o submit. Validação JS em PT continua cobrindo todos os casos. Verificado via Playwright: forma vazia → "Informe seu nome completo."; e-mail inválido → "Informe um e-mail válido."; senha < 8 → "A senha precisa ter pelo menos 8 caracteres.".
+
+### Bug #2 — Mesmo padrão no Step 3: `required` no checkbox de LGPD sobrepõe toast ✅ CORRIGIDO
+**Onde:** `/cadastro` — tela 3 do wizard, checkbox LGPD (`signup-wizard.tsx:456`)
+**Esperado:** Toast custom "Você precisa aceitar os Termos e a Política de Privacidade." (item 4.2 do roteiro).
+**Aconteceu:** Checkbox tem `required` HTML5; browser dispara tooltip nativo "Marque esta caixa se deseja continuar." e bloqueia `handleSubmit`. Toast nunca aparece. Bug irmão do #1, mesma causa raiz.
+**Repro:** chegar no Step 3, clicar "Criar conta" sem marcar o checkbox.
+**Correção aplicada (2026-05-22):** mesmo fix do #1 — `noValidate` no `<form>` do Step 3. Verificado via Playwright: avançar até Step 3 e submeter sem marcar o checkbox → toast "Você precisa aceitar os Termos e a Política de Privacidade.".
+
+### Bug #3 — Cadastro com "Confirm email" ligado cai em /login em vez de /verificar-email
+**Onde:** `/cadastro` — handleSubmit do wizard após criar conta (`signup-wizard.tsx:96-143`)
+**Esperado:** Após criar conta, redirecionar pra `/verificar-email` (item 4.3 do roteiro), com o cliente logado e capaz de reenviar e-mail e clicar "Já confirmei".
+**Aconteceu:** O backend cria o user via admin API (não confirmado). Em seguida o frontend chama `signInWithPassword`, que retorna **400 Bad Request** porque o Supabase tem "Confirm email" habilitado (setup obrigatório do roteiro). O `if (signInError)` cai no fallback: toast "Conta criada, mas não conseguimos te logar agora. Entre manualmente." + `router.push("/login")`. O cliente fica preso em /login — não consegue logar (e-mail não confirmado), não tem caminho pra reenviar e-mail (auth.resend nunca foi chamado), e nem sabe que precisa abrir o Gmail.
+**Repro:** 1. garantir Supabase com Confirm email ON. 2. concluir o wizard com e-mail novo. 3. clicar "Criar conta". Cai em /login. Console: `Failed to load resource: 400 @ /auth/v1/token?grant_type=password`.
+**Causa raiz:** Supabase bloqueia `signInWithPassword` de usuários com `email_confirmed_at = null` quando "Confirm email" está ON. O fluxo do wizard assume que o sign-in vai funcionar mesmo sem confirmação.
+**Sugestão:** detectar o erro específico de e-mail não confirmado (`error.message` contém "Email not confirmed" ou `error.code === "email_not_confirmed"`) e tratá-lo como sucesso: disparar `auth.resend({ type: "signup", email })` e `router.push("/verificar-email")`. Só cair em /login pra erros realmente inesperados. Alternativa mais simples: mover `auth.resend` pra antes do return de erro do sign-in, e sempre que `signupAction` retorna ok, redirecionar pra `/verificar-email` (mesmo sem sessão — a tela /verificar-email já tem "Já confirmei" que faz `refreshSession` + `getUser`).
+**Impacto:** crítico — bloqueia o caminho feliz inteiro do onboarding. Sem corrigir isso, nenhum cliente novo consegue completar o cadastro self-service. Atualmente o roteiro 4.3 → 8 está inteiro inválido com Confirm Email ON.
+**Correção aplicada (2026-05-20):** `onboarding.service.ts:47` agora cria o user com `email_confirm: true`. Cliente entra direto no painel pós-cadastro (alinhado ao PLAN.md "cliente loga e vê o painel antes de confirmar"). A tela `/verificar-email` vira passagem instantânea: como `user.email_confirmed_at` já está preenchido, `page.tsx:28` redireciona pra `/conectar-whatsapp` no mesmo carregamento. O gate `email_confirmed_at` em `provision-zapi` continua existindo como defesa em profundidade, mas nunca dispara pra cadastros via wizard (só pra contas manualmente desconfirmadas). **Esse fix muda o setup do roteiro: o item "Confirm email precisa estar habilitado" não é mais relevante — pode ficar ON ou OFF.** Item 4.4 esperava "e-mail não confirmado" — agora é "e-mail confirmado".
+
+### Bug #4 — Middleware não redireciona /precos pra /inbox quando logado ✅ CORRIGIDO
+**Onde:** `frontend/middleware.ts` (raiz) — entry-point inválido na estrutura do projeto
+**Esperado:** Item 10.1 — usuário logado acessando `/precos` deve ser redirecionado pra `/inbox`. `REDIRECT_WHEN_LOGGED_IN` inclui `/precos` (linha 14 do helper).
+**Aconteceu:** Navegando direto pra `http://localhost:3000/precos` com sessão Supabase válida (cookie `sb-...-auth-token` presente, `/inbox` carrega normalmente, `/api/me` retorna user), a página `/precos` renderiza normalmente sem redirect. `fetch('/precos', { redirect: 'manual' })` retorna 200 sem `Location` header — confirmando que o middleware decidiu não redirecionar.
+**Repro:** 1. logar como qualquer user. 2. navegar pra `/precos`. 3. ver que fica em `/precos` em vez de ir pra `/inbox`.
+**Causa raiz (achada com instrumentação Playwright + log no middleware):** o middleware estava em `frontend/middleware.ts` (raiz do projeto), mas o frontend usa estrutura `src/app/`. Em Next 16 com Turbopack, o entry-point do middleware precisa ficar em `frontend/src/middleware.ts` (ou `proxy.ts`) — o arquivo raiz é silenciosamente ignorado. Sintoma: nenhum log de instrumentação aparecia no console do dev server, mesmo em `/inbox`. A defesa em profundidade em `(app)/layout.tsx` (`if (!user) redirect("/login")`) é que mantinha o painel protegido — o middleware era decorativo.
+**Correção aplicada (2026-05-22):**
+1. Movido `frontend/middleware.ts` → `frontend/src/middleware.ts` (Next 16 reconheceu, mas avisou "The 'middleware' file convention is deprecated. Please use 'proxy' instead.")
+2. Migrado para a nova convenção do Next 16: arquivo renomeado para `frontend/src/proxy.ts`, função exportada renomeada de `middleware` → `proxy`. O helper `src/lib/supabase/middleware.ts` (e a função `updateSession`) ficou como está — é módulo interno, não entry-point.
+3. Validado via Playwright: logged-in user navegando para `/precos` → redirect para `/inbox` ✅; idem `/cadastro` ✅. Log do dev server mostra `proxy.ts: 42ms` em cada request.
+
+### Bug #6 — Hydration mismatch em ThemeToggle (Sun/Moon className) ✅ CORRIGIDO
+**Encontrado em:** Sweep adicional 2026-05-22 (não estava no roteiro original).
+**Onde:** `frontend/src/components/shell/theme-toggle.tsx`
+**Esperado:** Console limpo de errors em produção/dev.
+**Aconteceu:** Toda página do painel logava no console "A tree hydrated but some attributes of the server rendered HTML didn't match the client properties" apontando para `<Sun>` e `<Moon>` do `ThemeToggle`. Causa: `useTheme()` retorna `resolvedTheme=undefined` no SSR (next-themes resolve no cliente via localStorage/system). Server renderizava modo claro; cliente podia reidratar com dark e os classNames de `rotate/scale/opacity` divergiam.
+**Repro:** abrir DevTools → Console e visitar qualquer página interna do painel. Apareceria 1 erro de hydration por render.
+**Correção aplicada (2026-05-22):** estado `mounted` + `useEffect` em `ThemeToggle` faz `isDark = mounted && resolvedTheme === "dark"`. Antes do mount, ambos servidor e cliente renderizam com `isDark=false` (idêntico). Após mount, useEffect re-renderiza com o tema real. `suppressHydrationWarning` adicionado nos ícones e botão como defensive belt-and-suspenders. Validado via Playwright: console fica em 0 errors após o fix.
+
+### Bug #5 — Backend offline quebra o painel inteiro (sem fallback) ✅ CORRIGIDO
+**Onde:** `frontend/src/lib/backend.ts` — `fetchBackend` sem try/catch ao redor do `fetch`
+**Esperado:** Item 10.4 — backend parado, recarregar painel: "Banner some (tolera fetch falhar), painel continua acessível".
+**Aconteceu:** Backend parado, navegar pra `/inbox`: tela Next "This page couldn't load — A server error occurred. Reload to try again." com botão Reload. Painel inteiro inacessível. 2 issues no DevTools.
+**Repro:** 1. logar. 2. parar o backend Express (`Get-NetTCPConnection -LocalPort 3001 -State Listen | Stop-Process`). 3. navegar pra `/inbox`. 4. ver tela de erro do Next em vez do painel.
+**Causa raiz:** `fetchBackend` em `lib/backend.ts` chamava `await fetch(...)` sem try/catch. Com o backend offline, o fetch lança `TypeError: fetch failed` (ECONNREFUSED), e a exceção propaga pro Server Component (no caso, o `TrialBanner` no `(app)/layout.tsx`), derrubando toda a árvore. Outros callers (`assinatura/page.tsx`, etc.) já tratam `!result.ok`, mas nunca recebiam essa branch porque o erro era exception, não return.
+**Correção aplicada (2026-05-22):** try/catch ao redor do `fetch` em `fetchBackend`. Erro de rede vira `{ ok: false, error: { status: 0, code: "NETWORK_ERROR", message: "..." } }`. Todos os callers (3 Server Components + 3 actions) já tratam `!result.ok` — o `TrialBanner` retorna `null`, `assinatura/page.tsx` mostra "Não foi possível carregar sua assinatura. Recarregue.", `conectar-whatsapp/page.tsx` redireciona, actions reportam toast. Validado via Playwright: backend offline + navegação para `/inbox` → painel carrega completo, banner some (era esperado) ✅.
+

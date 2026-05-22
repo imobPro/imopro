@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 3 — Onboarding self-service (sub-sprint 9.2 concluído em 2026-05-11)
-**Próximo passo:** Sprint 9.3 — Frontend público (`/precos`, `/cadastro`, `/privacidade`, `/termos`) + interno (`/conectar-whatsapp` com QR, `/configuracoes/assinatura`, banner de trial)
+**Fase:** 3 — Onboarding self-service (sub-sprints 9.1 → 9.4 concluídos; Fase 3 completa para o MVP)
+**Próximo passo:** Validação manual no browser do roteiro `docs/roteiro-validacao-9.4.md` (~70 itens) — agora possível com Playwright MCP. Em paralelo, backlog técnico de prompt caching e benchmark de transcrição quando houver áudios reais. Cobrança real, Resend e tela de gestão de assinatura aguardam CNPJ + domínio (ver `docs/checklist-producao.md`).
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -141,7 +141,7 @@ Itens identificados na revisão dos módulos críticos com Context7. Não bloque
 
 ## Fase 3 — Onboarding automatizado
 **Duração estimada:** Mês 7–10
-**Status:** 🔄 Em andamento (sub-sprints 9.1 ✅ e 9.2 ✅)
+**Status:** ✅ MVP concluído (sub-sprints 9.1 → 9.4) — cobrança real e e-mail Resend são pós-MVP
 
 Decisões da entrevista (2026-05-10): cobrança **stubada** no MVP (gateway real só com MEI ativo), bifurcação shared/individual no cadastro, ImobPro provisiona Z-API via Partner API, trial **7 dias OU 50 mensagens**, pós-trial reusa `saveIncomingMessagesOnly`, plano único no MVP, e-mail confirmado antes de provisionar Z-API.
 
@@ -164,17 +164,37 @@ Decisões da entrevista (2026-05-11, Sprint 9.2): o relógio dos 7 dias do trial
 - 🔁 Pré-deploy restante: configurar `BACKEND_PUBLIC_URL`; conferir "Confirm email" no Supabase Auth; resolver client-token por instância para o `/webhook/whatsapp` das instâncias provisionadas (ver `docs/checklist-producao.md`)
 
 ### Sprint 9.3 — Frontend público + interno
-- [ ] `/precos` — landing pública com plano único + CTA de trial
-- [ ] `/cadastro` multi-step (tipo de operação → dados → aceite LGPD)
-- [ ] `/privacidade` e `/termos` (renderiza `docs/privacidade.md`/`docs/termos.md`)
-- [ ] `/conectar-whatsapp` — QR code com polling até `connected`
-- [ ] `/configuracoes/assinatura` — status do trial, botão "ativar plano" (stub)
-- [ ] Banner global de trial no shell do app (dias/mensagens restantes)
+- ✅ 2026-05-16 `/precos` — landing pública com 2 planos (Corretor R$297 / Imobiliária R$597) + CTA "7 dias grátis"
+- ✅ 2026-05-16 `/cadastro` — wizard de 3 telas (tipo de operação → dados → aceite LGPD); ao final faz `signInWithPassword` + `auth.resend` + push `/verificar-email`
+- ✅ 2026-05-16 `/privacidade` e `/termos` — renderizam `docs/privacidade.md` e `docs/termos.md` via `react-markdown`
+- ✅ 2026-05-16 `/verificar-email` (route group `(onboarding)`) — tela bloqueante com cooldown 60s no reenviar
+- ✅ 2026-05-16 `/conectar-whatsapp` — QR + contador 45s + polling 2.5s via `pollConnectionAction`; idempotente
+- ✅ 2026-05-16 `/configuracoes/assinatura` — 4 estados (trial pendente / ativo / expirado / canceled); `UpgradeCta` esconde botões se `NEXT_PUBLIC_SUPPORT_*` vazios
+- ✅ 2026-05-16 `TrialBanner` global no shell + gate de e-mail confirmado em `(app)/layout.tsx`
+- ✅ 2026-05-16 Lib helpers: `fetchBackend<T>` com Bearer JWT, `toBannerVariant`; `react-markdown` adicionado ao frontend
 
-### Pós-MVP (já mapeado, fora do escopo deste sprint)
+### Sprint 9.4 — Observabilidade Sentry + roteiro de validação
+- ✅ 2026-05-16 `@sentry/node` instalado e instrumentado no backend (`src/instrument.ts` como 1º import, `setupExpressErrorHandler` antes do errorHandler customizado)
+- ✅ 2026-05-16 Helpers `captureSilentError`, `addExternalCallBreadcrumb`, `withJobMonitoring` em `src/shared/observability/sentry.ts`
+- ✅ 2026-05-16 Lição 018 coberta em `leads.service.ts` (catches silenciosos que retornavam default agora reportam); lição 019 em `auth.ts`
+- ✅ 2026-05-16 Workers (`whatsapp.worker`, `billing.cron`, `reports.cron`) com `on('failed')` + `on('error')` reportando ao Sentry
+- ✅ 2026-05-16 Breadcrumbs nos 3 serviços externos críticos: `sendTextOnce` (Z-API), `generateResponse` (Anthropic), `transcribeAudio` (OpenAI)
+- ✅ 2026-05-16 `validate-env`: `SENTRY_DSN` opcional; `.env.example` documentado
+- ✅ 2026-05-16 `docs/roteiro-validacao-9.4.md`: 11 seções com ~70 itens para validação manual no browser (responsabilidade do Arthur; agora possível com Playwright MCP)
+
+### Sprint 9.5 — Redesign Clay + logo HomeMark (extra, não planejado)
+- ✅ 2026-05-20 Linguagem visual Clay aplicada em todo o frontend (paleta cream/matcha, cantos generosos, sombras suaves). `globals.css` reescrito; UI base (`button`, `card`, `badge`, `tabs`, `score-badge`) atualizada
+- ✅ 2026-05-20 Telas refeitas: marketing (precos, cadastro, header, footer), onboarding (verificar-email, conectar-whatsapp), painel (configuracoes, assinatura, leads, funil, metricas, relatorios, inbox, trial banner) e login
+- ✅ 2026-05-20 Inbox ganha split-view (`conversations-list` + `inbox-layout-shell` + `layout` do route group)
+- ✅ 2026-05-20 Componente `HomeMark` em `src/components/brand/`: casa minimalista em outline branco sobre fundo verde (matcha), fiel à referência do Arthur. Substitui o SVG duplicado em 4 lugares
+- ✅ 2026-05-20 Docs de referência commitados: `docs/imobpro-clay.md`, `docs/imobpro-android.md` (mobile pendente, ver Fase 4)
+- ✅ 2026-05-20 MCPs `playwright` e `chrome-devtools` instalados no scope `user` (`~/.claude.json`) — habilitam validação automática no browser
+
+### Pós-MVP (mapeado, fora do escopo do MVP)
 - [ ] Integração Stripe ou Asaas real (depende de CNPJ ativo)
 - [ ] E-mail de boas-vindas via Resend (depende de domínio validado)
 - [ ] Tela de gestão de assinatura (trocar plano, cancelar)
+- [ ] Banner pós-desconexão da Z-API (mais elaborado que o `TrialBanner`)
 
 ### Entregável da Fase 3
 - Cliente consegue se cadastrar e ativar o produto sem intervenção manual
