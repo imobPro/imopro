@@ -1,5 +1,11 @@
 export type SubscriptionStatus = "trial" | "expired" | "active" | "canceled";
 
+export type ZapiConnectionStatus =
+  | "not_provisioned"
+  | "awaiting_qr"
+  | "connected"
+  | "disconnected";
+
 export type SubscriptionView = {
   tenantId: string;
   status: SubscriptionStatus;
@@ -16,7 +22,10 @@ export type SubscriptionView = {
   accessAllowed: boolean;
 };
 
-export type SubscriptionResponse = { subscription: SubscriptionView };
+export type SubscriptionResponse = {
+  subscription: SubscriptionView;
+  zapiStatus: ZapiConnectionStatus;
+};
 
 export type BannerVariant = "hidden" | "neutral" | "warning" | "danger";
 
@@ -27,7 +36,22 @@ export type BannerCopy = {
   ctaHref: string;
 };
 
-export function toBannerVariant(sub: SubscriptionView): BannerCopy {
+export function toBannerVariant(
+  sub: SubscriptionView,
+  zapiStatus: ZapiConnectionStatus = "not_provisioned",
+): BannerCopy {
+  // Z-API caiu depois de conectar — prioridade máxima. Mesmo com assinatura
+  // ativa, sem WhatsApp conectado a IA não responde (worker silencia em 2c).
+  if (zapiStatus === "disconnected") {
+    return {
+      variant: "danger",
+      message:
+        "Seu WhatsApp desconectou. Reconecte para a IA voltar a responder seus leads.",
+      ctaLabel: "Reconectar",
+      ctaHref: "/conectar-whatsapp",
+    };
+  }
+
   if (sub.status === "active") {
     return { variant: "hidden", message: "", ctaLabel: "", ctaHref: "" };
   }

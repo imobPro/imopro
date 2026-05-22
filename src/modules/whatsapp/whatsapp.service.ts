@@ -1,3 +1,4 @@
+import { supabase } from '../../shared/database/supabase'
 import { whatsappQueue } from '../../shared/queue/queues'
 import { redisConnection } from '../../shared/queue/redis'
 import { runOnce } from '../../shared/queue/idempotency'
@@ -31,6 +32,28 @@ export async function markMessageSeen(tenantId: string, messageId: string): Prom
   const key = `seen_msg:${tenantId}:${messageId}`
   const result = await redisConnection.set(key, '1', 'EX', SEEN_MESSAGE_TTL_SECONDS, 'NX')
   return result === 'OK'
+}
+
+// ---------------------------------------------------------------------------
+// Resolução de tenant pelo instanceId Z-API (auth do /webhook/whatsapp)
+// ---------------------------------------------------------------------------
+// Cada tenant tem uma instância dedicada da Z-API (Sprint 9.2). O instanceId
+// é gerado pela Partner API e armazenado em `tenants.zapi_instance_id` — atua
+// como segredo compartilhado: a Z-API só posta callbacks no nosso webhook com
+// esse id se ela mesmo provisionou a instância. Sem match no DB, devolvemos
+// `null` e o controller descarta a mensagem sem retentar.
+
+export async function resolveTenantByInstance(instanceId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('id')
+    .eq('zapi_instance_id', instanceId)
+    .maybeSingle()
+  if (error) {
+    console.error(`[Webhook] resolveTenantByInstance falhou instance=${instanceId}: ${error.message}`)
+    return null
+  }
+  return data ? (data.id as string) : null
 }
 
 // ---------------------------------------------------------------------------

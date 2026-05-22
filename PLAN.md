@@ -9,8 +9,8 @@ Para detalhes do que foi construído em cada sessão, veja CHANGELOG.md.
 
 ## Status atual
 
-**Fase:** 3 — Onboarding self-service (sub-sprints 9.1 → 9.4 concluídos; Fase 3 completa para o MVP)
-**Próximo passo:** Validação manual no browser do roteiro `docs/roteiro-validacao-9.4.md` (~70 itens) — agora possível com Playwright MCP. Em paralelo, backlog técnico de prompt caching e benchmark de transcrição quando houver áudios reais. Cobrança real, Resend e tela de gestão de assinatura aguardam CNPJ + domínio (ver `docs/checklist-producao.md`).
+**Fase:** 3 — Onboarding self-service (sub-sprints 9.1 → 9.6 concluídos; Fase 3 completa para o MVP + hardening pré-deploy)
+**Próximo passo:** Recrutar 1 imobiliária piloto. Cobrança real, Resend e tela elaborada de gestão de assinatura aguardam CNPJ + domínio (ver `docs/checklist-producao.md`). Backlog técnico: prompt caching e benchmark de transcrição quando houver áudios reais.
 
 > Antes de rodar com cliente real, consultar [`docs/checklist-producao.md`](docs/checklist-producao.md)
 > — lista o que precisa ser pago/contratado por fase de escala (domínio, Resend, Z-API por instância, etc).
@@ -190,11 +190,17 @@ Decisões da entrevista (2026-05-11, Sprint 9.2): o relógio dos 7 dias do trial
 - ✅ 2026-05-20 Docs de referência commitados: `docs/imobpro-clay.md`, `docs/imobpro-android.md` (mobile pendente, ver Fase 4)
 - ✅ 2026-05-20 MCPs `playwright` e `chrome-devtools` instalados no scope `user` (`~/.claude.json`) — habilitam validação automática no browser
 
+### Sprint 9.6 — Hardening pré-deploy (Z-API auth + banner desconexão)
+- ✅ 2026-05-22 `/webhook/whatsapp` autenticado por posse do `instanceId` (substitui `ZAPI_CLIENT_TOKEN`): `resolveTenantByInstance` no `whatsapp.service.ts` resolve `tenants.zapi_instance_id` → tenant UUID. Sem match → 200 `ignored_unknown_instance`. Removidos: `requireZapiToken` middleware, `ZAPI_CLIENT_TOKEN` de `validate-env` e `.env.example`. **Pendência operacional**: legacy piloto precisa gravar seu `instanceId` em `tenants.zapi_instance_id` via SQL.
+- ✅ 2026-05-22 `classifyEvent` reconhece `disconnected: true` da Z-API (não `connected: false`): doc oficial verificada via context7. Adicionado campo `disconnected?: boolean` em `ZapiStatusWebhookPayload`. Connected continua aceitando ambos `type === 'ConnectedCallback'` E `connected === true`.
+- ✅ 2026-05-22 Worker silencia IA quando `zapi_status='disconnected'`: passo 2c no `processWhatsAppJob` reusa `silenceAndSave`. Lê `getZapiStatus(tenantId)` em paralelo com settings e subscription. Default permissivo (`not_provisioned` em erro de banco) — não bloqueia atendimento por leitura falha.
+- ✅ 2026-05-22 Banner danger pós-desconexão no painel: `/api/subscription` agora retorna `{ subscription, zapiStatus }`. `toBannerVariant(sub, zapiStatus)` prioriza `disconnected` sobre estados do trial (sempre danger). CTA "Reconectar" → `/conectar-whatsapp`.
+- ✅ 2026-05-22 8 testes novos (213 → 221): `getZapiStatus` (4 cenários), `resolveTenantByInstance` (3 cenários), `classifyEvent` aceita `disconnected: true` standalone. Atualizado teste antigo do `signup` que checava `email_confirm: false` (fix do dia 20 mudou pra `true`).
+
 ### Pós-MVP (mapeado, fora do escopo do MVP)
 - [ ] Integração Stripe ou Asaas real (depende de CNPJ ativo)
 - [ ] E-mail de boas-vindas via Resend (depende de domínio validado)
-- [ ] Tela de gestão de assinatura (trocar plano, cancelar)
-- [ ] Banner pós-desconexão da Z-API (mais elaborado que o `TrialBanner`)
+- [ ] Tela elaborada de gestão de assinatura (trocar plano, cancelar, histórico)
 
 ### Entregável da Fase 3
 - Cliente consegue se cadastrar e ativar o produto sem intervenção manual

@@ -40,6 +40,7 @@ import {
   getTrialMessageLimit,
   type Subscription,
 } from '../billing'
+import { getZapiStatus } from '../onboarding'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
@@ -222,11 +223,13 @@ export async function processWhatsAppJob(
     return
   }
 
-  // 2. Carregar configurações do tenant (Sprint 8) e subscription (Fase 3).
-  // Ambas falham em defaults seguros — atendimento não deve cair por config.
-  const [settings, subscription] = await Promise.all([
+  // 2. Carregar configurações do tenant (Sprint 8), subscription (Fase 3) e
+  // status da Z-API (Sprint 9.6). Os 3 falham em defaults permissivos — atendimento
+  // não deve cair por leitura. getZapiStatus retorna 'not_provisioned' em erro.
+  const [settings, subscription, zapiStatus] = await Promise.all([
     getTenantSettings(tenantId),
     getSubscription(tenantId),
+    getZapiStatus(tenantId),
   ])
   const schedule = buildScheduleFromTenant(settings.businessHoursStart, settings.businessHoursEnd)
   const withinHours = isWithinBusinessHours(schedule)
@@ -246,6 +249,16 @@ export async function processWhatsAppJob(
   if (!settings.agentActive) {
     console.log(`[Worker] Agente desligado | tenant=${tenantId} phone=${phone} — IA em silêncio`)
     await silenceAndSave(data, pendingMessages, 'agentActive=false')
+    return
+  }
+
+  // 2c. Z-API desconectado: silenciamos a IA pra não gerar tokens da Anthropic
+  // que a Z-API descartaria na hora de enviar. Race: dispositivo cai entre a
+  // recepção do callback e o processamento da fila. O banner danger no painel
+  // (frontend) cobre a UX — cliente vê que precisa reconectar.
+  if (zapiStatus === 'disconnected') {
+    console.log(`[Worker] Z-API desconectada | tenant=${tenantId} phone=${phone} — IA em silêncio`)
+    await silenceAndSave(data, pendingMessages, 'zapi=disconnected')
     return
   }
 

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Request, Response } from 'express'
-import { enqueueMessage, markMessageSeen } from './whatsapp.service'
+import { enqueueMessage, markMessageSeen, resolveTenantByInstance } from './whatsapp.service'
 
 // ---------------------------------------------------------------------------
 // Schema Zod — valida o payload Z-API em runtime
@@ -31,7 +31,9 @@ const ZApiWebhookSchema = z.object({
 const IGNORED_STATUSES = ['DELIVERY_ACK', 'READ', 'PLAYED', 'DELETED', 'PENDING', 'SERVER_ACK']
 
 export async function receiveWebhook(req: Request, res: Response): Promise<void> {
-  // Validação do token é feita pelo middleware requireZapiToken (antes de chegar aqui)
+  // Auth: a posse do instanceId (UUID de 30+ chars gerado pela Z-API e nunca
+  // exposto) é o segredo. resolveTenantByInstance busca em tenants.zapi_instance_id;
+  // sem match, a mensagem é descartada com 200 pra Z-API não retentar.
 
   const parsed = ZApiWebhookSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -58,8 +60,12 @@ export async function receiveWebhook(req: Request, res: Response): Promise<void>
     return
   }
 
-  // tenantId vem do instanceId da Z-API (cada tenant tem sua instância)
-  const tenantId = payload.instanceId
+  const tenantId = await resolveTenantByInstance(payload.instanceId)
+  if (!tenantId) {
+    console.warn(`[Webhook] instanceId=${payload.instanceId} sem tenant correspondente — ignorado`)
+    res.status(200).json({ received: true, action: 'ignored_unknown_instance' })
+    return
+  }
 
   // Idempotência: descartar reentrega do mesmo messageId (Z-API retransmite em
   // glitches de rede). Falha do Redis aqui não pode bloquear o atendimento —

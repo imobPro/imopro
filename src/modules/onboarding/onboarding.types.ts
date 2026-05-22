@@ -43,10 +43,14 @@ export interface ConnectionStatusResult {
 }
 
 // Payload do webhook de status da Z-API (callbacks "On Connected" / "On
-// Disconnected" das instâncias provisionadas). A Z-API envia vários outros
-// campos por evento — só estes nos interessam, o resto é ignorado pelo schema.
+// Disconnected" das instâncias provisionadas). Doc oficial (verificado em
+// 2026-05-22 via context7 /websites/developer_z-api_io):
+//   Connected:    { type: "ConnectedCallback",    connected: true,     instanceId, phone, momment }
+//   Disconnected: { type: "DisconnectedCallback", disconnected: true,  instanceId, error, momment }
+// Note: disconnect NÃO envia `connected: false` — o campo correto é `disconnected: true`.
 export interface ZapiStatusWebhookPayload {
   instanceId: string
   type?: string
   connected?: boolean
+  disconnected?: boolean
 }

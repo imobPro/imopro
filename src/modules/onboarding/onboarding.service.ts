@@ -273,6 +273,23 @@ export async function getConnectionStatus(tenantId: string): Promise<ConnectionS
   return { zapiStatus, qrCode: null }
 }
 
+// Lê apenas o status atual da Z-API. Usado pelo worker (silencia IA quando
+// desconectado) e pelo controller de billing (frontend mostra banner danger).
+// Default permissivo: erro de banco/ausência → 'not_provisioned' (não bloqueia
+// atendimento por falha de leitura).
+export async function getZapiStatus(tenantId: string): Promise<ZapiConnectionStatus> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('zapi_status')
+    .eq('id', tenantId)
+    .maybeSingle()
+  if (error) {
+    console.error(`[Onboarding] getZapiStatus falhou tenant=${tenantId}: ${error.message}`)
+    return 'not_provisioned'
+  }
+  return ((data?.zapi_status as ZapiConnectionStatus | null) ?? 'not_provisioned')
+}
+
 // -----------------------------------------------------------------------------
 // Webhook de status da Z-API (POST /webhook/zapi-status)
 // -----------------------------------------------------------------------------
@@ -285,7 +302,7 @@ export async function getConnectionStatus(tenantId: string): Promise<ConnectionS
 
 function classifyEvent(payload: ZapiStatusWebhookPayload): 'connected' | 'disconnected' | null {
   if (payload.type === 'ConnectedCallback' || payload.connected === true) return 'connected'
-  if (payload.type === 'DisconnectedCallback' || payload.connected === false) return 'disconnected'
+  if (payload.type === 'DisconnectedCallback' || payload.disconnected === true) return 'disconnected'
   return null
 }
 

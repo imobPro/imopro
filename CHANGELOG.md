@@ -36,6 +36,64 @@ Peça ao Claude Code: *"Registre no CHANGELOG o que foi feito nessa sessão."*
 
 ---
 
+## [2026-05-22] — Sprint 9.6 — Hardening pré-deploy (Z-API auth + banner desconexão)
+
+**Fase:** Fase 3 — Onboarding self-service (hardening pré-deploy)
+**Duração:** ~1 sessão
+
+### O que foi feito
+
+**Backend — Auth do `/webhook/whatsapp` por posse do `instanceId`**
+- `src/modules/whatsapp/whatsapp.service.ts` — nova função `resolveTenantByInstance(instanceId)` faz lookup em `tenants.zapi_instance_id` e devolve o UUID interno do tenant. `null` quando não acha (auth falha) ou em erro de banco (não vaza identidade pra Z-API)
+- `src/modules/whatsapp/whatsapp.controller.ts` — substitui `const tenantId = payload.instanceId` (bug latente, ver lessons.md) pelo lookup. Sem match → 200 `ignored_unknown_instance` (não retentar)
+- `src/modules/whatsapp/whatsapp.routes.ts` — removido `requireZapiToken`. O `instanceId` (UUID 30+ chars gerado pela Partner API e nunca exposto) atua como segredo, mesmo padrão de `/webhook/zapi-status`
+- `src/shared/middleware/zapi-token.ts` deletado
+- `validate-env.ts` e `.env.example` — `ZAPI_CLIENT_TOKEN` removido das obrigatórias (com nota de deprecação)
+- **Pendência operacional pra piloto legado**: gravar o `instanceId` da instância manual em `tenants.zapi_instance_id` via SQL one-shot — sem isso o webhook devolve `ignored_unknown_instance` (registrado em `docs/checklist-producao.md`)
+
+**Backend — `classifyEvent` reconhece `disconnected: true`**
+- `src/modules/onboarding/onboarding.types.ts` — adicionado `disconnected?: boolean` em `ZapiStatusWebhookPayload` + comentário com shape oficial da Z-API verificada via context7 (`/websites/developer_z-api_io`)
+- `src/modules/onboarding/onboarding.service.ts` — `classifyEvent` agora checa `payload.disconnected === true` (era `payload.connected === false`, dead code: a Z-API real nunca manda esse campo)
+
+**Backend — Worker silencia IA quando `zapi_status='disconnected'`**
+- `src/modules/onboarding/onboarding.service.ts` — nova função `getZapiStatus(tenantId)` lê só a coluna `zapi_status`. Default permissivo (`'not_provisioned'`) em erro/ausência — não bloqueia atendimento por leitura falha
+- `src/modules/whatsapp/whatsapp.worker.ts` — passo 2c no `processWhatsAppJob` ("Z-API desconectada") reusa `silenceAndSave`. Lê em paralelo com `getTenantSettings` e `getSubscription`. Evita gastar tokens da Anthropic gerando resposta que a Z-API descartaria
+
+**Backend — `/api/subscription` inclui `zapiStatus`**
+- `src/modules/billing/billing.controller.ts` — `getCurrentSubscription` agora retorna `{ subscription, zapiStatus }`. Frontend não precisa de 2 round-trips para banner + dashboard
+
+**Frontend — Banner danger pós-desconexão**
+- `frontend/src/lib/subscription.ts` — adicionado `ZapiConnectionStatus`, estendido `SubscriptionResponse` com `zapiStatus`. `toBannerVariant(sub, zapiStatus)` prioriza `disconnected` (variant=danger, CTA "Reconectar" → `/conectar-whatsapp`) sobre estados de trial
+- `frontend/src/components/trial-banner.tsx` — passa o `zapiStatus` pro `toBannerVariant`. Sem novo componente; o `TrialBanner` global já cobre
+
+**Testes — 213 → 221 (+8)**
+- `src/tests/whatsapp.service.auth.test.ts` (novo) — `resolveTenantByInstance`: 3 cenários (achou, não achou, erro de banco)
+- `src/tests/onboarding.service.test.ts` — 4 testes para `getZapiStatus` + 1 teste novo para `disconnected: true` standalone (sem `type`). Atualizado teste antigo do signup que ainda checava `email_confirm: false` (mudou pra `true` no fix do dia 20, esse teste tinha sido esquecido)
+
+### Arquivos modificados
+- Backend: `whatsapp.{controller,routes,service}.ts`, `onboarding.{service,types}.ts`, `onboarding/index.ts`, `billing.controller.ts`, `validate-env.ts`, `whatsapp.worker.ts`, `tests/setup.ts`, `.env.example`
+- Frontend: `lib/subscription.ts`, `components/trial-banner.tsx`
+- Deletados: `src/shared/middleware/zapi-token.ts`
+- Docs: `PLAN.md`, `lessons.md` (2 lições novas: Next 16 proxy location + identificador externo como chave interna), `docs/checklist-producao.md`
+
+### Decisões tomadas
+- **Auth por posse do `instanceId` em vez de configurar client-token compartilhado em cada instância via API**: o caminho da configuração via Partner API exige uma chamada extra por instância e depende de um endpoint da Z-API que pode não existir. Posse do `instanceId` é o mesmo padrão já usado em `/webhook/zapi-status` (UUID secreto não exposto). Coerência > dois mecanismos diferentes.
+- **Silenciar IA quando `zapi_status='disconnected'`**: Arthur escolheu "Banner danger sempre + IA não responde". Race aceito: dispositivo cai entre callback e processamento. Evita gastar tokens da Anthropic que a Z-API descartaria. Banner danger no painel cobre a UX — cliente vê e reconecta.
+- **`getZapiStatus` em módulo separado em vez de adicionar a `TenantSettings`**: `zapi_status` é estado computado pelo sistema (callback da Z-API), não config que o cliente edita. Misturar com `TenantSettings` (agentName, businessHours, etc.) confunde domínios. Custo: 1 query a mais no worker, paralelo via `Promise.all` — irrelevante.
+- **`/api/subscription` inclui `zapiStatus` em vez de criar `/api/tenant-status` separado**: ambos sempre são lidos juntos pelo painel (banner + página de assinatura). Endpoint separado seria 2 round-trips do Server Component. Quando a UI ficar mais complexa (settings, métricas, alertas), faz sentido separar.
+
+### Estado dos testes e build
+- 221 testes passando (213 → 221, +8)
+- `tsc --noEmit` limpo backend e frontend
+- Validado ao vivo: backend boot sem `ZAPI_CLIENT_TOKEN`, login + `/api/subscription` retorna nova shape `{ subscription, zapiStatus }`, banner do TrialBanner usa zapiStatus corretamente
+
+### Pendências para próxima sessão
+- [ ] **One-shot SQL no Supabase** quando for fazer o deploy real do piloto legado: `UPDATE tenants SET zapi_instance_id = '<instance-id-da-z-api>' WHERE id = '<tenant-do-piloto>'`. Sem isso o `/webhook/whatsapp` devolve `ignored_unknown_instance` pra ele.
+- [ ] `BACKEND_PUBLIC_URL` no Railway antes do primeiro cliente self-service (já documentado em `docs/checklist-producao.md`)
+- [ ] Recrutar 1 imobiliária piloto (próximo passo natural do projeto)
+
+---
+
 ## [2026-05-22] — Bugs do roteiro 9.4 corrigidos + migração proxy.ts (Next 16)
 
 **Fase:** Fase 3 — pós-MVP (correção de bugs encontrados na validação)

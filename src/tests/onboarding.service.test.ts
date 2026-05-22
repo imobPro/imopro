@@ -23,6 +23,7 @@ import {
   provisionZapi,
   getConnectionStatus,
   handleZapiStatusEvent,
+  getZapiStatus,
 } from '../modules/onboarding/onboarding.service'
 import { HttpError } from '../shared/errors/http-error'
 import { queueFromResponses } from './helpers/supabase-mock'
@@ -97,7 +98,7 @@ describe('signup', () => {
     expect(createUserMock).toHaveBeenCalledWith({
       email: 'joao@example.com',
       password: 'segredo123',
-      email_confirm: false,
+      email_confirm: true,
     })
     expect(tenantPayload).toMatchObject({
       name: 'João Silva',
@@ -411,10 +412,32 @@ describe('handleZapiStatusEvent', () => {
       [undefined, (p) => (updatePayload = p as Record<string, unknown>)],
     )
 
-    await handleZapiStatusEvent({ instanceId: 'inst-1', connected: false })
+    // Payload real da Z-API (verificado em 2026-05-22): { type: 'DisconnectedCallback', disconnected: true, ... }
+    await handleZapiStatusEvent({
+      instanceId: 'inst-1',
+      type: 'DisconnectedCallback',
+      disconnected: true,
+    })
 
     expect(updatePayload).toEqual({ zapi_status: 'disconnected' })
     expect(startTrialClockMock).not.toHaveBeenCalled()
+  })
+
+  it('desconexão por disconnected:true sozinho (sem campo type) também é reconhecida', async () => {
+    silenceConsole()
+    let updatePayload: Record<string, unknown> | undefined
+    queueFromResponses(
+      fromMock,
+      [
+        { data: { id: 'tenant-1', zapi_connected_at: '2026-05-01T00:00:00Z' }, error: null },
+        { data: null, error: null },
+      ],
+      [undefined, (p) => (updatePayload = p as Record<string, unknown>)],
+    )
+
+    await handleZapiStatusEvent({ instanceId: 'inst-1', disconnected: true })
+
+    expect(updatePayload).toEqual({ zapi_status: 'disconnected' })
   })
 
   it('instanceId desconhecido é no-op', async () => {
@@ -427,10 +450,37 @@ describe('handleZapiStatusEvent', () => {
     expect(startTrialClockMock).not.toHaveBeenCalled()
   })
 
-  it('evento ambíguo (sem connected nem type) é no-op sem nem consultar o banco', async () => {
+  it('evento ambíguo (sem connected, disconnected, ou type) é no-op sem nem consultar o banco', async () => {
     silenceConsole()
     await handleZapiStatusEvent({ instanceId: 'inst-1' })
     expect(fromMock).not.toHaveBeenCalled()
     expect(startTrialClockMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('getZapiStatus', () => {
+  it('retorna o status atual do tenant quando achado', async () => {
+    queueFromResponses(fromMock, [{ data: { zapi_status: 'connected' }, error: null }])
+    const status = await getZapiStatus('tenant-1')
+    expect(status).toBe('connected')
+  })
+
+  it('retorna not_provisioned quando a linha não existe (default permissivo)', async () => {
+    queueFromResponses(fromMock, [{ data: null, error: null }])
+    const status = await getZapiStatus('tenant-1')
+    expect(status).toBe('not_provisioned')
+  })
+
+  it('retorna not_provisioned em erro de banco (não bloqueia atendimento)', async () => {
+    silenceConsole()
+    queueFromResponses(fromMock, [{ data: null, error: { message: 'connection refused' } }])
+    const status = await getZapiStatus('tenant-1')
+    expect(status).toBe('not_provisioned')
+  })
+
+  it('retorna disconnected quando o tenant está com WhatsApp caído', async () => {
+    queueFromResponses(fromMock, [{ data: { zapi_status: 'disconnected' }, error: null }])
+    const status = await getZapiStatus('tenant-1')
+    expect(status).toBe('disconnected')
   })
 })

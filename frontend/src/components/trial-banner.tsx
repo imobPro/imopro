@@ -28,7 +28,7 @@ export async function TrialBanner() {
   // esconde o banner. Erros de auth já redirecionam via middleware/layout.
   if (!result.ok) return null;
 
-  const copy = toBannerVariant(result.data.subscription);
+  const copy = toBannerVariant(result.data.subscription, result.data.zapiStatus);
   if (copy.variant === "hidden") return null;
 
   return (

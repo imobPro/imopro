@@ -209,6 +209,15 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-05-22] — Identificador externo (Z-API instanceId) usado direto como chave interna (tenantId)
+
+**Contexto:** Sprint 9.6 / `whatsapp.controller.ts` — desde o Sprint 1, o webhook fazia `const tenantId = payload.instanceId`. Para o piloto manual isso funcionou por acidente (provavelmente os dois IDs colidiam ou havia mapping manual). Quando o onboarding self-service entrou (Sprint 9.2), cada tenant passou a ter um `instanceId` próprio gerado pela Partner API da Z-API, que é um UUID-like de 30+ chars, NÃO igual ao `tenants.id` (que é UUID v4 nosso).
+**O que estava errado:** O worker enfileirava jobs com `tenantId = <z-api instance id>`, e em seguida fazia `agents WHERE tenant_id = <z-api instance id>` — lookup vazio, IA nunca responde. Bug latente que só apareceria com o primeiro cliente self-service. Sintoma idêntico a "WhatsApp não conectado" do ponto de vista do usuário.
+**O que foi corrigido:** Criada `resolveTenantByInstance(instanceId): tenantId | null` que faz lookup em `tenants.zapi_instance_id`. Controller passou a usar o tenant UUID retornado. Sem match → 200 `ignored_unknown_instance` (não autenticado como nosso tenant). Auth por shared `ZAPI_CLIENT_TOKEN` removido em favor de posse do `instanceId` (que é UUID secreto).
+**Regra para não repetir:** Identificador de sistema externo (ID Z-API, ID Stripe customer, ID Twilio account, etc.) é **dado**, não chave. Sempre fazer mapping explícito numa coluna do tipo `external_provider_id` e usar a chave interna (UUID nosso) como tenant_id. Quando recebido em webhook, fazer lookup → tenant_id antes de qualquer query domain. Ler `payload.x` direto como tenant_id é dívida que cobra juros quando o produto sai do "um cliente piloto" pra n clientes self-service.
+
+---
+
 ## [2026-05-22] — Middleware do Next 16 silenciosamente ignorado quando fora do `src/`
 
 **Contexto:** `frontend/middleware.ts` foi criado no diretório raiz do projeto Next, mas o frontend usa estrutura `src/app/`. Em Next 15 isso ainda funcionava; em Next 16 com Turbopack o arquivo é silenciosamente ignorado, sem warning no dev server.

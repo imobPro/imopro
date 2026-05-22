@@ -1,12 +1,15 @@
 // SUPABASE_JWT_SECRET removido: auth.ts agora usa JWKS (chaves assimétricas
 // do Supabase via /auth/v1/.well-known/jwks.json). O segredo HMAC não é mais
 // usado pelo backend.
+// ZAPI_CLIENT_TOKEN removido (Sprint 9.6): /webhook/whatsapp passou a autenticar
+// por posse do instanceId (resolveTenantByInstance). Apenas o piloto manual
+// legado dependia desse token compartilhado — pra ele basta gravar o instanceId
+// dele em tenants.zapi_instance_id (one-shot SQL).
 const REQUIRED_VARS: string[] = [
   'ANTHROPIC_API_KEY',
   'REDIS_URL',
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'ZAPI_CLIENT_TOKEN',
 ]
 
 // Opcionais por enquanto — feature é desabilitada quando a chave falta.
