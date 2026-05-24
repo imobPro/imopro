@@ -87,6 +87,8 @@ export function ConversationsList({ leads }: Props) {
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          {/* suppressHydrationWarning: gerenciadores de senha (Kaspersky, LastPass) injetam
+              caret-color/style no <input> entre SSR e hidratação. Não é bug nosso. */}
           <Input
             type="search"
             value={query}
@@ -94,6 +96,7 @@ export function ConversationsList({ leads }: Props) {
             placeholder="Buscar nome, telefone..."
             className="h-10 pl-9 rounded-lg"
             aria-label="Buscar conversa"
+            suppressHydrationWarning
           />
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1">

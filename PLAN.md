@@ -127,7 +127,7 @@ Itens identificados na revisão dos módulos críticos com Context7. Não bloque
 - ✅ 2026-05-02 **Idempotência por `messageId`** — `markMessageSeen` com Redis SET NX EX 24h descarta reentregas no controller. Defesa em camadas com UNIQUE no DB. `attempts: 1` mantido até flag "delivered" por job ser implementada.
 - ✅ 2026-05-09 **Reativar `attempts > 1`** — `attempts: 3` + backoff exponencial 30s→1m→2m. Helper `runOnce(jobId, label, fn)` em `shared/queue/idempotency.ts`; especialização `sendTextOnce` em `whatsapp.service.ts`. Todos os `zapi.sendText` do worker (resposta IA, fora horário, retomada handoff, resposta preparatória, espera sentimento, alerta corretor) e o `scoreUp` (único side-effect INCREMENT do banco) passam pelo runOnce — retries após stalled não duplicam.
 - [ ] **Avaliar `gpt-4o-mini-transcribe`** vs `whisper-1` para PT-BR — benchmark com áudios reais de leads.
-- [ ] **Prompt caching no Anthropic SDK** — só compensa quando o system prompt passar de 1024 tokens (cache mínimo Sonnet). Quando enriquecermos com glossário de bairros / scripts de objeção, ativar `cache_control: ephemeral`.
+- [ ] **Prompt caching no Anthropic SDK** — só compensa quando o system prompt passar de 1024 tokens (cache mínimo Sonnet). Medido em 2026-05-24: `buildSystemPrompt` ~730 tokens e `buildHandoffPreparatorySystemPrompt` ~470 tokens — ambos abaixo do mínimo. Reavaliar quando enriquecermos com glossário de bairros / scripts de objeção; só então ativar `cache_control: ephemeral`.
 - ✅ 2026-05-09 **Cap defensivo em `history`** — `MAX_HISTORY_MESSAGES = 30` no `ai-engine.service.ts`, `slice(-30)` mantém as mais recentes. Cobre o caso de caller passar mais que o esperado ou da RPC `get_conversation_history` mudar de comportamento.
 
 ### Performance
