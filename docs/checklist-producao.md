@@ -96,7 +96,6 @@ Ficar atento, mas sem ação imediata.
 Coisas mencionadas no roadmap mas que **não foram contratadas nem implementadas** —
 não pague enquanto não chegar a hora.
 
-- **Vivareal / OLX Imóveis** (integração de portfólio — Fase 4)
 - **Google Calendar / Gmail / Drive** (integrações via MCP — Fase 4)
 - **Managed Agents da Anthropic** (substituir loop manual — Fase 4, fora de Research Preview ainda)
 
@@ -110,6 +109,7 @@ necessidade reaparecer.
 | Item | Quando saiu | Motivo |
 |---|---|---|
 | **N8N Cloud** | 2026-05-10 | Mencionado no CLAUDE.md original como camada de "Automações secundárias e webhooks", mas nunca foi usado. Toda lógica está em Node/Express + BullMQ, sem demanda concreta para N8N. Reavaliar se surgir caso de uso de integração no-code com terceiros. |
+| **Captação ativa de imóveis (Vivareal / OLX scraping)** | 2026-05-24 | Avaliada como nova feature: monitorar anúncios de proprietários em portais para corretores prospectarem. Descartada por dois motivos. (1) ToS dos portais brasileiros proíbem raspagem por terceiros — Vivareal/OLX já moveram ações contra produtos similares; liminar derrubaria a feature de todos os clientes ao mesmo tempo. (2) LGPD: captura de telefone+nome de anunciante PF para prospecção comercial tem base legal frágil ("legítimo interesse" com ônus da prova no controlador). Captação inbound (proprietário que escolhe nos procurar) já é coberta pelo `intent=venda` da IA atual — não é feature nova. Reavaliar só se houver parceria oficial com algum portal, e somente com 3+ clientes pagantes pra ter leverage comercial. |
 
 ---
 

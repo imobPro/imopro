@@ -214,8 +214,6 @@ Decisões da entrevista (2026-05-11, Sprint 9.2): o relógio dos 7 dias do trial
 
 - [ ] Planos Basic / Pro / Enterprise com limites e permissões
 - [ ] **Áudio como feature paga** — transcrição Whisper desligada no Basic, ligada no Pro/Enterprise. Plug-and-play (já existe na infra), só falta gating por plano
-- [ ] Integração com Vivareal (importar portfólio de imóveis)
-- [ ] Integração com OLX Imóveis
 - [ ] **Integração Google Calendar** — agente verifica agenda do corretor e propõe horários disponíveis ao lead direto na conversa. Diferencial competitivo (nenhum concorrente faz hoje)
 - [ ] **Integração Gmail** — entrega dos relatórios mensais via Gmail MCP em vez do mailer próprio do Sprint 7
 - [ ] **Integração Google Drive** — relatórios PDF arquivados em pasta dedicada por imobiliária, geradas automaticamente no provisionamento

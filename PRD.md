@@ -24,7 +24,6 @@ A imobiliária assina o plano, conecta seu número do WhatsApp e passa a ter um 
 - Imobiliária com 10–30 corretores
 - Quer métricas e relatórios de atendimento
 - Precisa de visibilidade sobre quantos leads chegam e o que acontece com eles
-- Quer integrar com portais como Vivareal e OLX (Fase 4)
 
 ---
 
