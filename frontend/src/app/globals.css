@@ -77,8 +77,8 @@
 
   /* Clay signature shadows */
   --shadow-clay-card: 0 1px 1px rgb(0 0 0 / 0.10), inset 0 -1px 1px rgb(0 0 0 / 0.04), 0 -0.5px 1px rgb(0 0 0 / 0.05);
-  --shadow-clay-hard: -7px 7px 0 rgb(0 0 0);
-  --shadow-clay-soft: -4px 4px 0 rgb(0 0 0);
+  --shadow-clay-hard: -7px 7px 0 rgb(0 0 0 / 0.4);
+  --shadow-clay-soft: -4px 4px 0 rgb(0 0 0 / 0.3);
 
   --animate-slide-in-clay: slide-in-clay var(--duration-base) var(--ease-out-quart);
 }

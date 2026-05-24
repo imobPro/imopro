@@ -63,3 +63,9 @@ tmp/
 
 # ─── Claude Code (estado interno do agente, não versionar) ───────────────────
 .claude/*.lock
+
+# ─── Artefatos de validação manual (screenshots, diag, browser MCP) ──────────
+.playwright-mcp/
+diag-*.ps1
+/re-*.png
+/s[0-9]*-*.png

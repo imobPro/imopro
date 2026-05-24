@@ -47,11 +47,7 @@ export function MobileTopBar({ agentName, title }: Props) {
           aria-label="ImobPro"
           className="flex items-center gap-2 pl-2"
         >
-          <HomeMark
-            containerClassName="size-8 rounded-lg"
-            iconClassName="size-4"
-            strokeWidth={1.6}
-          />
+          <HomeMark containerClassName="size-8 rounded-lg" />
         </Link>
       )}
 

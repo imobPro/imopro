@@ -15,10 +15,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm flex flex-col items-stretch gap-7 animate-in fade-in slide-in-from-bottom-2 duration-slow ease-out-quart">
         <header className="text-center flex flex-col items-center gap-3">
-          <HomeMark
-            containerClassName="size-14 rounded-2xl shadow-clay-card"
-            iconClassName="size-7"
-          />
+          <HomeMark containerClassName="size-14 rounded-2xl shadow-clay-card" />
           <div className="flex flex-col gap-1">
             <h1 className="font-display-tight text-5xl md:text-6xl text-foreground">
               ImobPro

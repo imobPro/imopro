@@ -18,13 +18,13 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
-        // Clay variants — assinatura visual: hover playful com rotateZ + hard shadow
+        // Clay variants — hover: lift + hard shadow (sem rotação)
         swatch:
-          "bg-primary text-primary-foreground shadow-clay-card hover:-rotate-3 hover:-translate-y-1 hover:shadow-clay-hard active:rotate-0 active:translate-y-0 active:shadow-none",
+          "bg-primary text-primary-foreground shadow-clay-card hover:-translate-y-1 hover:shadow-clay-hard active:translate-y-0 active:shadow-none",
         clay:
-          "bg-foreground text-background shadow-clay-card hover:-rotate-2 hover:-translate-y-1 hover:shadow-clay-hard active:rotate-0 active:translate-y-0 active:shadow-none",
+          "bg-foreground text-background shadow-clay-card hover:-translate-y-1 hover:shadow-clay-hard active:translate-y-0 active:shadow-none",
         "clay-secondary":
-          "bg-card text-foreground border-border shadow-clay-card hover:bg-lemon-400 hover:text-foreground hover:border-lemon-700 hover:-rotate-1 hover:-translate-y-0.5 hover:shadow-clay-soft active:rotate-0 active:translate-y-0 active:shadow-none",
+          "bg-card text-foreground border-border shadow-clay-card hover:bg-lemon-400 hover:text-foreground hover:border-lemon-700 hover:-translate-y-0.5 hover:shadow-clay-soft active:translate-y-0 active:shadow-none",
       },
       size: {
         default:
