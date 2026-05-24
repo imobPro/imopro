@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { InboxMockupBg } from "./_components/inbox-mockup-bg";
 
 export const metadata = {
   title: "Preços — ImobPro",
@@ -50,8 +51,9 @@ const PLANOS: Plano[] = [
 
 export default function PrecosPage() {
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
-      <header className="flex flex-col items-center gap-4 text-center">
+    <div className="relative mx-auto w-full max-w-6xl px-4 py-12 md:px-6 md:py-16">
+      <InboxMockupBg />
+      <header className="relative flex flex-col items-center gap-4 text-center">
         <span className="inline-flex items-center gap-2 rounded-full border border-dashed border-matcha-600 bg-matcha-300/40 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-matcha-800 dark:bg-matcha-300/15 dark:text-matcha-300">
           <Sparkles className="size-3.5" />
           7 dias grátis em todos os planos
@@ -65,7 +67,7 @@ export default function PrecosPage() {
         </p>
       </header>
 
-      <div className="mt-12 grid gap-6 md:grid-cols-2 md:mt-14">
+      <div className="relative mt-12 grid gap-6 md:grid-cols-2 md:mt-14">
         {PLANOS.map((plano) => {
           const featured = plano.destaque;
           return (
@@ -156,7 +158,7 @@ export default function PrecosPage() {
         })}
       </div>
 
-      <p className="mt-12 text-center text-xs text-muted-foreground">
+      <p className="relative mt-12 text-center text-xs text-muted-foreground">
         Sem cartão de crédito durante o trial. Cancele a qualquer momento.
       </p>
     </div>
