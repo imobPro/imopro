@@ -33,8 +33,8 @@ Sem isso, o produto não roda na vida real nem para testar com 1 imobiliária.
 
 | Item | Onde | Custo | Notas |
 |---|---|---|---|
-| **Cap de spending Anthropic** | console.anthropic.com → Billing → Limits | Grátis | Definir teto mensal hard (ex: US$ 50) para evitar surpresa em bug que consuma tokens em loop. |
-| **Cap de spending OpenAI** | platform.openai.com → Settings → Limits | Grátis | Mesma lógica do Anthropic. Recomendado: US$ 20/mês no piloto. |
+| ~~**Cap de spending Anthropic**~~ ✅ | console.anthropic.com → Settings → Limites | Grátis | Configurado em 2026-05-30: hard US$ 50/mês + alerta por e-mail em US$ 30. Reset todo dia 1. |
+| **Cap de spending OpenAI** | platform.openai.com → Settings → Limits | Grátis | **Adiado** (decisão 2026-05-30) — Arthur ainda sem caixa pra contratar OpenAI/Whisper no piloto. Quando contratar, recomendado: US$ 20/mês. Implicação atual: lead que mandar áudio recebe falha do `transcribeAudio`; feature flag pra fallback elegante fica pra depois (ver project_status_pre_cliente em memory). |
 | **LGPD — Política de Privacidade** | `docs/privacidade.md` | Grátis | Rascunho criado em 2026-05-10. Vincular no rodapé do painel e no fluxo de onboarding. **Revisão de advogado antes de escalar.** |
 | **LGPD — Termos de Uso** | `docs/termos.md` | Grátis | Rascunho criado em 2026-05-10. Aceite explícito no cadastro. **Revisão de advogado antes de escalar.** |
 | **LGPD — Acordo de Operador (DPA)** | `docs/dpa.md` | Grátis | Rascunho criado em 2026-05-10. Anexar ao contrato de assinatura do piloto. **Revisão de advogado antes de escalar.** |

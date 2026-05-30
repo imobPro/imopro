@@ -1,0 +1,73 @@
+# Prompts de Qualidade Frontend — ImobPro
+
+Use esses prompts no Claude Code antes de mostrar o painel para o primeiro cliente.
+Rode na ordem indicada para melhores resultados.
+
+---
+
+## Ordem recomendada antes do primeiro cliente
+
+1. Responsividade
+2. Refatoração de CSS
+3. Semântica HTML
+4. Debugging (usar sempre que aparecer bug)
+
+---
+
+## 1. Responsividade
+
+Quando usar: antes de mostrar o painel para qualquer cliente.
+
+Prompt:
+"Adapte o painel do ImobPro para tablet e mobile mantendo a hierarquia
+visual, espaçamentos consistentes e sem quebrar o layout desktop.
+Use boas práticas de responsividade.
+Verifica todas as telas: login, caixa de entrada, leads, funil, métricas,
+relatórios e configurações."
+
+---
+
+## 2. Refatoração de CSS
+
+Quando usar: após terminar o Sprint 8.5, antes do deploy.
+
+Prompt:
+"Refatore o CSS do frontend do ImobPro deixando mais organizado,
+reutilizável e fácil de manter.
+Evite repetição e mantenha a aparência visual atual.
+Use variáveis CSS para cores, espaçamentos e tipografia."
+
+---
+
+## 3. Semântica HTML
+
+Quando usar: antes de colocar o painel no ar para clientes reais.
+
+Prompt:
+"Revise a estrutura HTML do frontend do ImobPro e ajuste headings,
+landmarks e semântica para melhorar SEO e acessibilidade.
+Garante que leitores de tela consigam navegar corretamente."
+
+---
+
+## 4. Debugging
+
+Quando usar: sempre que aparecer um bug visual ou de comportamento.
+
+Prompt:
+"Encontre possíveis causas para esse bug no CSS/JS e explique
+o problema antes de sugerir a solução.
+[DESCREVA O BUG AQUI]"
+
+Exemplo de uso:
+"Encontre possíveis causas para esse bug no CSS/JS e explique
+o problema antes de sugerir a solução.
+O menu lateral some em telas menores que 768px."
+
+---
+
+## Dica de uso
+
+Sempre que for rodar um desses prompts, abra o painel em
+localhost:3000 em paralelo para ver as mudanças em tempo real.
+Use Ctrl+R para atualizar sem precisar reiniciar o servidor.
