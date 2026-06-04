@@ -19,10 +19,9 @@ apiRouter.post('/provision-zapi', requireAuth, postProvisionZapi)
 apiRouter.get('/connection', requireAuth, getConnection)
 
 // Webhook chamado pela Z-API nas callbacks de conexão/desconexão das instâncias
-// provisionadas. Sem requireZapiToken: instâncias criadas via Partner API não
-// enviam o ZAPI_CLIENT_TOKEN compartilhado por padrão; o instanceId funciona
-// como segredo e handleZapiStatusEvent descarta instâncias desconhecidas.
-// TODO: validar assinatura quando configurarmos client-token por instância.
+// provisionadas. Sem middleware de auth: o instanceId no payload é o segredo
+// (UUID gerado pela Partner API), e handleZapiStatusEvent descarta instâncias
+// não cadastradas em tenants.zapi_instance_id.
 const webhookRouter = Router()
 webhookRouter.post('/zapi-status', postZapiStatusWebhook)
 

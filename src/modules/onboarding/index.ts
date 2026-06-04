@@ -4,6 +4,7 @@ export {
   getConnectionStatus,
   handleZapiStatusEvent,
   getZapiStatus,
+  getZapiInstanceCredentials,
 } from './onboarding.service'
 
 export { onboardingRouter, onboardingWebhookRouter } from './onboarding.routes'

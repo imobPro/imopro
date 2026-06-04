@@ -273,6 +273,37 @@ export async function getConnectionStatus(tenantId: string): Promise<ConnectionS
   return { zapiStatus, qrCode: null }
 }
 
+// Lê as credenciais Z-API gravadas pelo provisionamento self-service. Usado
+// pelo worker pra montar o ZApiClient com o token CORRETO do tenant em vez de
+// um env global compartilhado (que só funcionava no piloto manual legacy).
+// Fallback pro env: tenants legacy sem provisionamento via Partner API ainda
+// têm zapi_instance_token NULL — caem no ZAPI_TOKEN compartilhado do .env.
+// Sem credenciais em nenhum lugar: retorna null e o worker apenas loga, não envia.
+export async function getZapiInstanceCredentials(
+  tenantId: string,
+): Promise<{ instanceId: string; instanceToken: string } | null> {
+  const { data, error } = await supabase
+    .from('tenants')
+    .select('zapi_instance_id, zapi_instance_token')
+    .eq('id', tenantId)
+    .maybeSingle()
+  if (error) {
+    console.error(`[Onboarding] getZapiInstanceCredentials falhou tenant=${tenantId}: ${error.message}`)
+    return null
+  }
+  const instanceId = data?.zapi_instance_id as string | null
+  const tenantToken = data?.zapi_instance_token as string | null
+  const envToken = process.env.ZAPI_TOKEN ?? null
+  const envInstance = process.env.ZAPI_INSTANCE_ID ?? null
+
+  if (instanceId && tenantToken) return { instanceId, instanceToken: tenantToken }
+  // Legacy piloto manual: nem o tenant tem token gravado nem foi provisionado
+  // pela Partner API. Usa env. Apenas se AMBOS env vars existirem — caso
+  // contrário o piloto não foi configurado.
+  if (envInstance && envToken) return { instanceId: envInstance, instanceToken: envToken }
+  return null
+}
+
 // Lê apenas o status atual da Z-API. Usado pelo worker (silencia IA quando
 // desconectado) e pelo controller de billing (frontend mostra banner danger).
 // Default permissivo: erro de banco/ausência → 'not_provisioned' (não bloqueia

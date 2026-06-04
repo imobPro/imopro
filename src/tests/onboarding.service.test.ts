@@ -24,7 +24,9 @@ import {
   getConnectionStatus,
   handleZapiStatusEvent,
   getZapiStatus,
+  getZapiInstanceCredentials,
 } from '../modules/onboarding/onboarding.service'
+import { ZapiStatusWebhookSchema } from '../modules/onboarding/onboarding.controller'
 import { HttpError } from '../shared/errors/http-error'
 import { queueFromResponses } from './helpers/supabase-mock'
 
@@ -455,6 +457,73 @@ describe('handleZapiStatusEvent', () => {
     await handleZapiStatusEvent({ instanceId: 'inst-1' })
     expect(fromMock).not.toHaveBeenCalled()
     expect(startTrialClockMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('getZapiInstanceCredentials', () => {
+  const ORIG_TOKEN = process.env.ZAPI_TOKEN
+  const ORIG_INSTANCE = process.env.ZAPI_INSTANCE_ID
+
+  afterEach(() => {
+    if (ORIG_TOKEN === undefined) delete process.env.ZAPI_TOKEN
+    else process.env.ZAPI_TOKEN = ORIG_TOKEN
+    if (ORIG_INSTANCE === undefined) delete process.env.ZAPI_INSTANCE_ID
+    else process.env.ZAPI_INSTANCE_ID = ORIG_INSTANCE
+  })
+
+  it('retorna as credenciais do tenant quando ambas estão gravadas', async () => {
+    queueFromResponses(fromMock, [
+      { data: { zapi_instance_id: 'inst-tenant', zapi_instance_token: 'tok-tenant' }, error: null },
+    ])
+
+    const creds = await getZapiInstanceCredentials('tenant-1')
+
+    expect(creds).toEqual({ instanceId: 'inst-tenant', instanceToken: 'tok-tenant' })
+  })
+
+  it('fallback pro env quando o tenant não tem credenciais (piloto manual legacy)', async () => {
+    process.env.ZAPI_INSTANCE_ID = 'inst-env'
+    process.env.ZAPI_TOKEN = 'tok-env'
+    queueFromResponses(fromMock, [
+      { data: { zapi_instance_id: null, zapi_instance_token: null }, error: null },
+    ])
+
+    const creds = await getZapiInstanceCredentials('tenant-1')
+
+    expect(creds).toEqual({ instanceId: 'inst-env', instanceToken: 'tok-env' })
+  })
+
+  it('retorna null quando nem tenant nem env têm credenciais', async () => {
+    delete process.env.ZAPI_INSTANCE_ID
+    delete process.env.ZAPI_TOKEN
+    queueFromResponses(fromMock, [
+      { data: { zapi_instance_id: null, zapi_instance_token: null }, error: null },
+    ])
+
+    const creds = await getZapiInstanceCredentials('tenant-1')
+
+    expect(creds).toBeNull()
+  })
+})
+
+describe('ZapiStatusWebhookSchema', () => {
+  it('aceita o flag disconnected standalone (Zod 9.6 fix)', () => {
+    const parsed = ZapiStatusWebhookSchema.safeParse({
+      instanceId: 'inst-1',
+      disconnected: true,
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.disconnected).toBe(true)
+  })
+
+  it('aceita payload completo de DisconnectedCallback', () => {
+    const parsed = ZapiStatusWebhookSchema.safeParse({
+      instanceId: 'inst-1',
+      type: 'DisconnectedCallback',
+      disconnected: true,
+    })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data.disconnected).toBe(true)
   })
 })
 

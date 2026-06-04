@@ -40,7 +40,7 @@ import {
   getTrialMessageLimit,
   type Subscription,
 } from '../billing'
-import { getZapiStatus } from '../onboarding'
+import { getZapiStatus, getZapiInstanceCredentials } from '../onboarding'
 import type { WhatsAppMessageJob } from '../../shared/queue/queue.types'
 import type { ConversationContext, ZApiClient } from './whatsapp.types'
 import type { AgentConfig } from '../ai-engine'
@@ -179,7 +179,7 @@ export async function processWhatsAppJob(
   queue: Queue<WhatsAppMessageJob>,
 ): Promise<void> {
   const data = job.data
-  const { tenantId, phone, instanceId } = data
+  const { tenantId, phone } = data
   // job.id é gerado pelo BullMQ, único por job e estável em retries do mesmo job
   // (stalled detection). É o identificador correto para chaves de runOnce — não
   // compartilha entre sequências distintas como o dedup id ou um id derivado de
@@ -191,8 +191,8 @@ export async function processWhatsAppJob(
     const active = await isHandoffActive(tenantId, phone)
     if (active) {
       console.log(`[Worker] Corretor não assumiu | tenant=${tenantId} phone=${phone} — IA retoma`)
-      const instanceToken = process.env.ZAPI_TOKEN
-      const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
+      const creds = await getZapiInstanceCredentials(tenantId)
+      const zapi = creds ? buildZApiClient(creds.instanceId, creds.instanceToken) : null
       if (zapi) {
         try {
           const sent = await sendTextOnce(zapi, jobId, 'handoff_resume', {
@@ -223,18 +223,20 @@ export async function processWhatsAppJob(
     return
   }
 
-  // 2. Carregar configurações do tenant (Sprint 8), subscription (Fase 3) e
-  // status da Z-API (Sprint 9.6). Os 3 falham em defaults permissivos — atendimento
-  // não deve cair por leitura. getZapiStatus retorna 'not_provisioned' em erro.
-  const [settings, subscription, zapiStatus] = await Promise.all([
+  // 2. Carregar configurações do tenant (Sprint 8), subscription (Fase 3), status
+  // Z-API (Sprint 9.6) e credenciais Z-API do tenant. Os 4 falham em defaults
+  // permissivos — atendimento não deve cair por leitura. getZapiStatus retorna
+  // 'not_provisioned' em erro. getZapiInstanceCredentials retorna null quando
+  // o tenant não tem instância gravada nem há env legacy configurado.
+  const [settings, subscription, zapiStatus, zapiCreds] = await Promise.all([
     getTenantSettings(tenantId),
     getSubscription(tenantId),
     getZapiStatus(tenantId),
+    getZapiInstanceCredentials(tenantId),
   ])
   const schedule = buildScheduleFromTenant(settings.businessHoursStart, settings.businessHoursEnd)
   const withinHours = isWithinBusinessHours(schedule)
-  const instanceToken = process.env.ZAPI_TOKEN
-  const zapi = instanceToken ? buildZApiClient(instanceId, instanceToken) : null
+  const zapi = zapiCreds ? buildZApiClient(zapiCreds.instanceId, zapiCreds.instanceToken) : null
 
   // 2a. Trial expirado/canceled: IA fica em silêncio, mensagem salva no painel.
   // Mesmo padrão do toggle agentActive=false. subscription=null (caso

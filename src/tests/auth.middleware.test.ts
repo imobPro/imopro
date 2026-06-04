@@ -12,12 +12,22 @@ vi.mock('../modules/agents', () => ({
 let publicKey: CryptoKey
 let privateKey: CryptoKey
 let wrongPrivateKey: CryptoKey
+// Modo da função do JWKS — quando 'timeout', simula falha infraestrutural
+// (Supabase fora do ar) e o middleware deve responder 503, não 401.
+let jwksMode: 'ok' | 'timeout' = 'ok'
 
 vi.mock('jose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('jose')>()
   return {
     ...actual,
-    createRemoteJWKSet: () => async () => publicKey,
+    createRemoteJWKSet: () => async () => {
+      if (jwksMode === 'timeout') {
+        const err = new Error('JWKS request timed out') as Error & { code?: string }
+        err.code = 'ERR_JWKS_TIMEOUT'
+        throw err
+      }
+      return publicKey
+    },
   }
 })
 
@@ -82,6 +92,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.mocked(findActiveAgentByUserId).mockReset()
+  jwksMode = 'ok'
 })
 
 describe('requireAuth', () => {
@@ -168,6 +179,21 @@ describe('requireAuth', () => {
 
     expect(res._status).toBe(403)
     expect((res._body as { error: { code: string } }).error.code).toBe('NO_ACTIVE_AGENT')
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('retorna 503 AUTH_TEMP_UNAVAILABLE quando JWKS está inalcançável (não desloga o usuário)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    jwksMode = 'timeout'
+    const token = await signValid()
+    const req = makeReq({ authorization: `Bearer ${token}` })
+    const res = makeRes()
+    const next = makeNext()
+
+    await requireAuth(req, res, next)
+
+    expect(res._status).toBe(503)
+    expect((res._body as { error: { code: string } }).error.code).toBe('AUTH_TEMP_UNAVAILABLE')
     expect(next).not.toHaveBeenCalled()
   })
 

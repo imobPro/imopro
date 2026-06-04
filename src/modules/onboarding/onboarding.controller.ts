@@ -21,10 +21,13 @@ const SignupSchema = z.object({
   acceptedTerms: z.literal(true, { message: 'É necessário aceitar os termos' }),
 })
 
-const ZapiStatusWebhookSchema = z.object({
+export const ZapiStatusWebhookSchema = z.object({
   instanceId: z.string().min(1),
   type: z.string().optional(),
   connected: z.boolean().optional(),
+  // Doc Z-API: DisconnectedCallback envia `disconnected: true` (não `connected: false`).
+  // Sem este campo, Zod strip-a o flag e classifyEvent só captura desconexão via `type`.
+  disconnected: z.boolean().optional(),
 })
 
 function firstZodMessage(err: z.ZodError): string {

@@ -228,4 +228,14 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-06-04] — Schema Zod desalinhado do tipo TS silenciosamente faz strip do campo
+
+**Contexto:** Sprint 9.6 corrigiu `classifyEvent` (onboarding.service.ts) para aceitar o flag `disconnected: true` standalone do callback Z-API. O tipo `ZapiStatusWebhookPayload` foi atualizado com `disconnected?: boolean`. **O schema Zod em onboarding.controller.ts NÃO foi atualizado em conjunto.** Code review max encontrou no fix #6.
+**O que estava errado:** `z.object()` faz `.strip()` por default — campos não declarados no schema são removidos silenciosamente do parsed. Resultado: o webhook recebia `{ instanceId, disconnected: true }`, Zod entregava `{ instanceId }`, e `classifyEvent` retornava `null` (ambíguo). Hoje só passou porque a Z-API envia `type='DisconnectedCallback'` junto com o flag — se a Z-API parar de enviar o type (ou se for um payload parcial em failover), desconexão é ignorada e o banner danger nunca aparece pro cliente. Defesa em profundidade prometida pelo Sprint 9.6 = dead code.
+**Como achei:** Code review max (parcial — 7 angles bloqueados por session limit, manual fechou o resto). Foi a discrepância entre o tipo `ZapiStatusWebhookPayload` (declara `disconnected?: boolean`) e o `ZapiStatusWebhookSchema` (não declara) que entregou. Testes existentes passavam porque chamavam `handleZapiStatusEvent` direto, pulando a camada Zod.
+**O que foi corrigido:** Adicionado `disconnected: z.boolean().optional()` no schema. Schema exportado para teste direto (`ZapiStatusWebhookSchema.safeParse({ instanceId, disconnected: true })`). Testes novos no `onboarding.service.test.ts` cobrem o schema isoladamente.
+**Regra para não repetir:** Schema Zod e tipo TS são duas declarações da mesma forma. Quando uma muda, a outra tem que mudar junto. Default do `z.object()` é strip silencioso — não há erro de runtime, não há warning. Defesa: (1) testar o schema diretamente (`schema.safeParse`), não só o handler abaixo dele; (2) quando o handler usa `payload.foo`, esse `foo` tem que aparecer literalmente no schema acima — se não aparece, é dead code. Vale auditar outros pares schema/handler do projeto pra confirmar paridade.
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

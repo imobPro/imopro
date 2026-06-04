@@ -52,7 +52,26 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       clockTolerance: 10,
     })
     payload = result.payload
-  } catch {
+  } catch (err) {
+    // jose emite codes específicos para problemas infraestruturais do JWKS
+    // (timeout, fetch fail, JSON inválido). Sem distinção, qualquer hiccup do
+    // Supabase derrubava o usuário com 401 (frontend interpretava como sessão
+    // inválida e fazia logout). 503 sinaliza retry temporário sem deslogar.
+    const code = (err as { code?: string } | null)?.code
+    const isJwksInfra =
+      code === 'ERR_JWKS_TIMEOUT' ||
+      code === 'ERR_JWKS_INVALID' ||
+      code === 'ERR_JWKS_NO_MATCHING_KEY'
+    if (isJwksInfra) {
+      captureSilentError(err instanceof Error ? err : new Error(String(err)), {
+        module: 'Auth',
+        operation: 'jwtVerify (JWKS unreachable)',
+      })
+      res
+        .status(503)
+        .json({ error: { code: 'AUTH_TEMP_UNAVAILABLE', message: 'Serviço de autenticação indisponível, tente novamente em instantes' } })
+      return
+    }
     res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token inválido ou expirado' } })
     return
   }
