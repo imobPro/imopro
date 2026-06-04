@@ -38,7 +38,7 @@ Sem isso, o produto não roda na vida real nem para testar com 1 imobiliária.
 | **LGPD — Política de Privacidade** | `docs/privacidade.md` | Grátis | Rascunho criado em 2026-05-10. Vincular no rodapé do painel e no fluxo de onboarding. **Revisão de advogado antes de escalar.** |
 | **LGPD — Termos de Uso** | `docs/termos.md` | Grátis | Rascunho criado em 2026-05-10. Aceite explícito no cadastro. **Revisão de advogado antes de escalar.** |
 | **LGPD — Acordo de Operador (DPA)** | `docs/dpa.md` | Grátis | Rascunho criado em 2026-05-10. Anexar ao contrato de assinatura do piloto. **Revisão de advogado antes de escalar.** |
-| **Sentry — projeto Node** | sentry.io → Free tier (5k errors/mês) | Grátis | Decidido em 2026-05-10: observabilidade primária via Sentry. Integrar com `@sentry/node` no backend e worker BullMQ. |
+| ~~**Sentry — projeto Node**~~ ✅ | sentry.io → Free tier (5k errors/mês) | Grátis | Configurado em 2026-06-04: projeto criado, DSN em `.env` local (`SENTRY_DSN` + `SENTRY_ENVIRONMENT=development`). SDK já estava integrado desde Sprint 9.4. **Pendência:** replicar `SENTRY_DSN` no Railway com `SENTRY_ENVIRONMENT=production` no deploy. |
 
 ---
 
