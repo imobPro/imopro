@@ -1,6 +1,7 @@
 import { Worker, Queue, type Job } from 'bullmq'
 import * as Sentry from '@sentry/node'
 import { redisConnection } from '../../shared/queue/redis'
+import { withJobMonitoring } from '../../shared/observability/sentry'
 import { WHATSAPP_QUEUE_NAME } from '../../shared/queue/queues'
 import { buildScheduleFromTenant, isWithinBusinessHours } from '../../shared/utils/business-hours'
 import {
@@ -516,7 +517,16 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
 
   const worker = new Worker<WhatsAppMessageJob>(
     WHATSAPP_QUEUE_NAME,
-    async (job) => processWhatsAppJob(job, queue),
+    async (job) =>
+      withJobMonitoring(
+        {
+          queue: WHATSAPP_QUEUE_NAME,
+          jobId: job.id ?? 'unknown',
+          jobName: job.name,
+          tenantId: job.data?.tenantId,
+        },
+        () => processWhatsAppJob(job, queue),
+      ),
     {
       connection: redisConnection,
       concurrency: 5,
@@ -526,20 +536,9 @@ export function startWhatsAppWorker(): Worker<WhatsAppMessageJob> {
     },
   )
 
+  // withJobMonitoring no processor já captura no Sentry; aqui só log local.
   worker.on('failed', (job, err) => {
     console.error(`[Worker] Job falhou | jobId=${job?.id} tentativa=${job?.attemptsMade} erro=${err.message}`)
-    Sentry.withScope((scope) => {
-      scope.setTag('queue', WHATSAPP_QUEUE_NAME)
-      scope.setTag('job_name', job?.name ?? 'unknown')
-      if (job?.id) scope.setTag('job_id', job.id)
-      if (job?.data?.tenantId) scope.setTag('tenant_id', job.data.tenantId)
-      scope.setContext('job', {
-        attemptsMade: job?.attemptsMade,
-        delay: job?.delay,
-        phone: job?.data?.phone,
-      })
-      Sentry.captureException(err)
-    })
   })
 
   worker.on('error', (err) => {

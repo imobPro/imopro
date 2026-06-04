@@ -15,8 +15,7 @@ const SignupSchema = z.object({
   fullName: z.string().trim().min(2).max(80),
   realtyName: z.string().trim().min(2).max(120).optional(),
   email: z.string().trim().min(3).max(254).regex(EMAIL_RE, 'E-mail inválido'),
-  // bcrypt trunca em 72 bytes — não vale exigir mais que isso.
-  password: z.string().min(8).max(72),
+  password: z.string().min(8).max(128),
   phone: z.string().trim().min(8).max(20).optional(),
   acceptedTerms: z.literal(true, { message: 'É necessário aceitar os termos' }),
 })

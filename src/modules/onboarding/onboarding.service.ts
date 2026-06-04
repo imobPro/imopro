@@ -379,10 +379,6 @@ export async function handleZapiStatusEvent(payload: ZapiStatusWebhookPayload): 
     return
   }
 
-  const { error: upErr } = await supabase
-    .from('tenants')
-    .update({ zapi_status: 'disconnected' })
-    .eq('id', tenantId)
-  if (upErr) console.error(`[Webhook] zapi-status: update disconnected falhou tenant=${tenantId}: ${upErr.message}`)
+  await setZapiStatus(tenantId, 'disconnected')
   console.log(`[Webhook] zapi-status: tenant=${tenantId} desconectado`)
 }

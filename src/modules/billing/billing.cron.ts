@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq'
 import * as Sentry from '@sentry/node'
 import { redisConnection } from '../../shared/queue/redis'
+import { withJobMonitoring } from '../../shared/observability/sentry'
 import {
   billingQueue,
   BILLING_QUEUE_NAME,
@@ -32,23 +33,27 @@ export async function registerBillingSchedules(): Promise<void> {
 export function startBillingWorker(): Worker<BillingJobData> {
   const worker = new Worker<BillingJobData>(
     BILLING_QUEUE_NAME,
-    async (job) => {
-      const start = Date.now()
-      const name = job.name as BillingJobName
-      console.log(`[Billing] Job recebido | name=${name}`)
+    async (job) =>
+      withJobMonitoring(
+        { queue: BILLING_QUEUE_NAME, jobId: job.id ?? 'unknown', jobName: job.name },
+        async () => {
+          const start = Date.now()
+          const name = job.name as BillingJobName
+          console.log(`[Billing] Job recebido | name=${name}`)
 
-      switch (name) {
-        case 'expire-trials': {
-          const expired = await expireTrialsByTime()
-          console.log(`[Billing] Trials expirados por prazo | count=${expired}`)
-          break
-        }
-        default:
-          throw new Error(`[Billing] Job desconhecido: ${String(name)}`)
-      }
+          switch (name) {
+            case 'expire-trials': {
+              const expired = await expireTrialsByTime()
+              console.log(`[Billing] Trials expirados por prazo | count=${expired}`)
+              break
+            }
+            default:
+              throw new Error(`[Billing] Job desconhecido: ${String(name)}`)
+          }
 
-      console.log(`[Billing] Job ${name} concluído | ${Date.now() - start}ms`)
-    },
+          console.log(`[Billing] Job ${name} concluído | ${Date.now() - start}ms`)
+        },
+      ),
     {
       connection: redisConnection,
       concurrency: 1,
@@ -56,14 +61,9 @@ export function startBillingWorker(): Worker<BillingJobData> {
     },
   )
 
+  // withJobMonitoring no processor já captura no Sentry; aqui só log local.
   worker.on('failed', (job, err) => {
     console.error(`[Billing] Job ${job?.name ?? '?'} falhou: ${err.message}`)
-    Sentry.withScope((scope) => {
-      scope.setTag('queue', BILLING_QUEUE_NAME)
-      scope.setTag('job_name', job?.name ?? 'unknown')
-      if (job?.id) scope.setTag('job_id', job.id)
-      Sentry.captureException(err)
-    })
   })
 
   worker.on('error', (err) => {

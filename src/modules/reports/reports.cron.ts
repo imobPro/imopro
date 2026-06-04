@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq'
 import * as Sentry from '@sentry/node'
 import { redisConnection } from '../../shared/queue/redis'
+import { withJobMonitoring } from '../../shared/observability/sentry'
 import {
   reportsQueue,
   REPORTS_QUEUE_NAME,
@@ -38,29 +39,33 @@ export async function registerReportsSchedules(): Promise<void> {
 export function startReportsWorker(): Worker<ReportsJobData> {
   const worker = new Worker<ReportsJobData>(
     REPORTS_QUEUE_NAME,
-    async (job) => {
-      const start = Date.now()
-      const name = job.name as ReportsJobName
-      console.log(`[Reports] Job recebido | name=${name}`)
+    async (job) =>
+      withJobMonitoring(
+        { queue: REPORTS_QUEUE_NAME, jobId: job.id ?? 'unknown', jobName: job.name },
+        async () => {
+          const start = Date.now()
+          const name = job.name as ReportsJobName
+          console.log(`[Reports] Job recebido | name=${name}`)
 
-      switch (name) {
-        case 'monthly':
-          await runReportsForAllAgents('monthly')
-          break
-        case 'weekly':
-          await runReportsForAllAgents('weekly')
-          break
-        case 'inactive-flag': {
-          const result = await flagInactiveLeadsAllTenants()
-          console.log(`[Reports] Inativos | tenants=${result.tenants} flagged=${result.flagged}`)
-          break
-        }
-        default:
-          throw new Error(`[Reports] Job desconhecido: ${String(name)}`)
-      }
+          switch (name) {
+            case 'monthly':
+              await runReportsForAllAgents('monthly')
+              break
+            case 'weekly':
+              await runReportsForAllAgents('weekly')
+              break
+            case 'inactive-flag': {
+              const result = await flagInactiveLeadsAllTenants()
+              console.log(`[Reports] Inativos | tenants=${result.tenants} flagged=${result.flagged}`)
+              break
+            }
+            default:
+              throw new Error(`[Reports] Job desconhecido: ${String(name)}`)
+          }
 
-      console.log(`[Reports] Job ${name} concluído | ${Date.now() - start}ms`)
-    },
+          console.log(`[Reports] Job ${name} concluído | ${Date.now() - start}ms`)
+        },
+      ),
     {
       connection: redisConnection,
       concurrency: 1, // Processamento serial — geração+envio podem ser caros
@@ -68,14 +73,9 @@ export function startReportsWorker(): Worker<ReportsJobData> {
     }
   )
 
+  // withJobMonitoring no processor já captura no Sentry; aqui só log local.
   worker.on('failed', (job, err) => {
     console.error(`[Reports] Job ${job?.name ?? '?'} falhou: ${err.message}`)
-    Sentry.withScope((scope) => {
-      scope.setTag('queue', REPORTS_QUEUE_NAME)
-      scope.setTag('job_name', job?.name ?? 'unknown')
-      if (job?.id) scope.setTag('job_id', job.id)
-      Sentry.captureException(err)
-    })
   })
 
   worker.on('error', (err) => {

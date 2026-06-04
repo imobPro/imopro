@@ -83,9 +83,6 @@ export function QrDisplay({ initialStatus, initialQrCode }: Props) {
         lastQrRef.current = result.data.qrCode;
         setQrCode(result.data.qrCode);
         setSecondsLeft(QR_LIFETIME_SECONDS);
-      } else if (!result.data.qrCode && lastQrRef.current === null) {
-        // Aguardando QR pela primeira vez.
-        setQrCode(null);
       }
     };
 
