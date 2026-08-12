@@ -44,7 +44,7 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 ## Regras de arquitetura — NUNCA violar
 
-1. **Toda query no banco DEVE ter `client_id`** — sem exceção. Isso garante isolamento de dados entre tenants.
+1. **Toda query no banco DEVE ter `tenant_id`** — sem exceção. Isso garante isolamento de dados entre tenants. **Novos services de negócio DEVEM usar `tenantDb(tenantId)` de `src/shared/database/tenant-db.ts`** — ele injeta `tenant_id` automaticamente em `from().select/insert/upsert/update/delete`. O cliente `supabase` cru continua disponível como escape hatch (via `.raw`) para tabelas globais (`tenants` pesquisada por `id`, `plans`, lookup cross-tenant deliberado como cron `flagInactiveLeadsAllTenants`, `supabase.auth.admin.*`, `supabase.storage`). Nunca use o cliente cru em tabela de negócio (`leads`, `conversations`, `messages`, `agents`, `reports`) sem `.eq('tenant_id', ...)` imediatamente após — se você fizer isso, prefira o wrapper.
 2. **Nunca misturar lógica de negócio com controllers** — controllers só recebem request e chamam services.
 3. **Cada módulo é independente** — `/leads`, `/conversations`, `/reports`, `/tenants` não se importam diretamente.
 4. **Variáveis de ambiente para toda credencial** — nunca hardcodar API keys, tokens ou senhas.

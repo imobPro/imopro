@@ -260,4 +260,15 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-08-12] — service_role bypassa RLS: sorte é isolamento hoje, não trava
+
+**Contexto:** Etapa 2 da auditoria de segurança (achado #8, T2 do quality-gate.md). O cliente `supabase` exportado de `src/shared/database/supabase.ts` usa `SUPABASE_SERVICE_ROLE_KEY` — que **ignora RLS por completo**. Ou seja: a policy `leads_owner_or_unassigned` da migration 004 não protege NADA que passe pelo backend. Todos os ~60 call sites de `.from('...')` no `src/` filtram por `tenant_id` manualmente hoje, então não há vazamento em produção.
+**O que estava errado:** "Todos filtram hoje" não é uma trava. É sorte. Primeiro dev/agente que fizer `supabase.from('leads').select('*')` sem `.eq('tenant_id', ...)` — para debug, protótipo, "só um select rápido pra ver os dados" — vaza a base inteira. Não vai aparecer em nenhum teste unitário porque o service passou. Só vai aparecer quando o cliente A ligar dizendo que viu leads do cliente B no painel. RLS existir mas ser bypassado é pior do que RLS não existir: dá falsa sensação de segurança em code review ("está protegido, tem RLS").
+**Como achei:** Etapa 1 da auditoria, T2 do `auditoria-seguranca.md`. Grep `from ['"]@supabase/supabase-js['"]` mostrou 1 arquivo (`shared/database/supabase.ts` — canônico). O problema era 1 nível acima: o valor exportado era o cliente cru, sem escopo de tenant.
+**O que foi corrigido:** Criado `src/shared/database/tenant-db.ts` com `tenantDb(tenantId)` — wrapper que injeta `tenant_id` automaticamente em `from().select/insert/upsert/update/delete`. Escape hatch via `.raw` para tabelas globais (`tenants` por `id`, `plans`, cron cross-tenant, `auth.admin`, `storage`). Testes em `src/tests/tenant-db.test.ts` (13 casos) travam a asserção mais importante: a chain nasce com `.eq('tenant_id', tenantId)` — se afrouxarem esse teste, a trava vira placebo. Regra 1 do CLAUDE.md atualizada obrigando `tenantDb` para novos services de negócio. **Os 60 call sites existentes NÃO foram migrados** neste commit — todos estão corretos hoje, migração incremental sem urgência (ver como isso vira exigência total: regra ESLint proibindo `import { supabase }` fora de `shared/database/` — descartado agora por bloquear todos os arquivos atuais).
+**Regra para não repetir:** Todo service novo que toca tabela de negócio (`leads`, `conversations`, `messages`, `agents`, `reports`) usa `tenantDb(tenantId)`. Nunca importar o `supabase` cru em arquivo de negócio, salvo justificativa explícita (tabela global ou lookup cross-tenant deliberado, e nesse caso comentar por quê). Ao revisar PR com novo service, primeira checagem: o service importa `tenantDb`? Se importa `supabase` direto, o dev tem que defender a decisão.
+**Pergunta de verificação:** "Algum service novo que eu criei/toquei importa o `supabase` cru em vez de `tenantDb`? Se sim, o que ele faz justifica escape hatch (tabela global, cross-tenant deliberado, storage/auth) — e isso está explícito em comentário?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->
