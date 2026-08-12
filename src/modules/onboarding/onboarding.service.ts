@@ -135,6 +135,7 @@ interface TenantZapiRow {
   zapi_status: ZapiConnectionStatus | null
   zapi_instance_id: string | null
   zapi_instance_token: string | null
+  webhook_secret: string
 }
 
 function getBackendPublicUrl(): string {
@@ -152,7 +153,7 @@ function getBackendPublicUrl(): string {
 async function loadTenantZapi(tenantId: string): Promise<TenantZapiRow> {
   const { data, error } = await supabase
     .from('tenants')
-    .select('zapi_status, zapi_instance_id, zapi_instance_token')
+    .select('zapi_status, zapi_instance_id, zapi_instance_token, webhook_secret')
     .eq('id', tenantId)
     .maybeSingle()
 
@@ -215,13 +216,22 @@ export async function provisionZapi(tenantId: string, userId: string): Promise<P
 
   // Sem instância: cria via Partner API.
   const base = getBackendPublicUrl()
+  const secret = tenant.webhook_secret
+  if (!secret) {
+    // Coluna NOT NULL na migration 013 — se estiver vazia, o schema regrediu.
+    throw new HttpError(
+      500,
+      'WEBHOOK_SECRET_MISSING',
+      'Tenant sem webhook_secret. Rodar migration 013.',
+    )
+  }
   let created: ZapiCreateInstanceResult
   try {
     created = await createInstance({
       name: `imobpro-${tenantId}`,
-      receivedCallbackUrl: `${base}/webhook/whatsapp`,
-      connectedCallbackUrl: `${base}/webhook/zapi-status`,
-      disconnectedCallbackUrl: `${base}/webhook/zapi-status`,
+      receivedCallbackUrl: `${base}/webhook/whatsapp/${secret}`,
+      connectedCallbackUrl: `${base}/webhook/zapi-status/${secret}`,
+      disconnectedCallbackUrl: `${base}/webhook/zapi-status/${secret}`,
     })
   } catch (err) {
     if (err instanceof ZapiError) {

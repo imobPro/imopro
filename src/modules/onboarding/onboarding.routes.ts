@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { requireAuth } from '../../shared/middleware/auth'
+import { requireWebhookSecret } from '../../shared/middleware/webhook-secret'
 import {
   getConnection,
   postProvisionZapi,
@@ -18,11 +19,30 @@ apiRouter.post('/signup', signupLimiter, postSignup)
 apiRouter.post('/provision-zapi', requireAuth, postProvisionZapi)
 apiRouter.get('/connection', requireAuth, getConnection)
 
-// Webhook chamado pela Z-API nas callbacks de conexão/desconexão das instâncias
-// provisionadas. Sem middleware de auth: o instanceId no payload é o segredo
-// (UUID gerado pela Partner API), e handleZapiStatusEvent descarta instâncias
-// não cadastradas em tenants.zapi_instance_id.
+// Rate limit por secret — reconexões/desconexões legítimas ocorrem raramente;
+// 60/min por secret é folgado e ainda barra abuso.
+const statusPerSecretLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: (req) => {
+    const s = req.params.secret
+    if (typeof s === 'string' && s.length > 0) return s
+    return req.ip ?? 'unknown'
+  },
+})
+
+// Webhook autenticado por secret no path (achados #1/#2 da auditoria).
 const webhookRouter = Router()
+webhookRouter.post(
+  '/zapi-status/:secret',
+  statusPerSecretLimiter,
+  requireWebhookSecret,
+  postZapiStatusWebhook,
+)
+
+// Rota legacy sem :secret — mantida durante a janela de deploy para permitir
+// rotação de callbacks Z-API. REMOVER depois que todos os tenants apontarem
+// para a URL nova.
 webhookRouter.post('/zapi-status', postZapiStatusWebhook)
 
 export { apiRouter as onboardingRouter, webhookRouter as onboardingWebhookRouter }

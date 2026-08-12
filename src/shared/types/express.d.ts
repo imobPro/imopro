@@ -8,5 +8,9 @@ declare module 'express-serve-static-core' {
       tenantId: string
       agentId: string
     }
+    webhookTenant?: {
+      tenantId: string
+      zapiInstanceId: string | null
+    }
   }
 }

@@ -31,9 +31,10 @@ const ZApiWebhookSchema = z.object({
 const IGNORED_STATUSES = ['DELIVERY_ACK', 'READ', 'PLAYED', 'DELETED', 'PENDING', 'SERVER_ACK']
 
 export async function receiveWebhook(req: Request, res: Response): Promise<void> {
-  // Auth: a posse do instanceId (UUID de 30+ chars gerado pela Z-API e nunca
-  // exposto) é o segredo. resolveTenantByInstance busca em tenants.zapi_instance_id;
-  // sem match, a mensagem é descartada com 200 pra Z-API não retentar.
+  // Auth: quando a rota tem :secret, o middleware requireWebhookSecret já
+  // resolveu o tenant e populou req.webhookTenant. Rota legacy sem secret cai
+  // no fallback resolveTenantByInstance — mantida durante a janela de deploy
+  // para o operador rotacionar callbacks Z-API via /update-every-webhooks.
 
   const parsed = ZApiWebhookSchema.safeParse(req.body)
   if (!parsed.success) {
@@ -60,11 +61,30 @@ export async function receiveWebhook(req: Request, res: Response): Promise<void>
     return
   }
 
-  const tenantId = await resolveTenantByInstance(payload.instanceId)
-  if (!tenantId) {
-    console.warn(`[Webhook] instanceId=${payload.instanceId} sem tenant correspondente — ignorado`)
-    res.status(200).json({ received: true, action: 'ignored_unknown_instance' })
-    return
+  let tenantId: string | null
+  if (req.webhookTenant) {
+    // Defense in depth: quem tem secret válido do tenant B não pode injetar
+    // payload marcado como instanceId do tenant A. Só rejeita se o tenant
+    // resolvido tem um instanceId conhecido e ele é diferente do do payload.
+    const knownInstanceId = req.webhookTenant.zapiInstanceId
+    if (knownInstanceId && knownInstanceId !== payload.instanceId) {
+      console.warn(
+        `[Webhook] Spoofing detectado: secret do tenant=${req.webhookTenant.tenantId} ` +
+        `foi usado com instanceId=${payload.instanceId} (esperado ${knownInstanceId})`,
+      )
+      res.status(401).json({ error: { code: 'INSTANCE_MISMATCH' } })
+      return
+    }
+    tenantId = req.webhookTenant.tenantId
+  } else {
+    // Rota legacy /webhook/whatsapp (sem :secret) — a remover após rotação
+    console.warn('[Webhook] Rota legacy sem :secret usada — rotacionar callbacks Z-API')
+    tenantId = await resolveTenantByInstance(payload.instanceId)
+    if (!tenantId) {
+      console.warn(`[Webhook] instanceId=${payload.instanceId} sem tenant correspondente — ignorado`)
+      res.status(200).json({ received: true, action: 'ignored_unknown_instance' })
+      return
+    }
   }
 
   // Idempotência: descartar reentrega do mesmo messageId (Z-API retransmite em

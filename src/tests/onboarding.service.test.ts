@@ -215,7 +215,7 @@ describe('provisionZapi', () => {
     queueFromResponses(
       fromMock,
       [
-        { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null }, error: null },
+        { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null, webhook_secret: 'sec-abc' }, error: null },
         { data: null, error: null },
       ],
       [undefined, (p) => (updatePayload = p as Record<string, unknown>)],
@@ -228,9 +228,9 @@ describe('provisionZapi', () => {
     expect(result).toEqual({ status: 'awaiting_qr', qrCode: 'qr-base64' })
     expect(createInstanceMock).toHaveBeenCalledWith({
       name: 'imobpro-tenant-1',
-      receivedCallbackUrl: 'https://backend.test/webhook/whatsapp',
-      connectedCallbackUrl: 'https://backend.test/webhook/zapi-status',
-      disconnectedCallbackUrl: 'https://backend.test/webhook/zapi-status',
+      receivedCallbackUrl: 'https://backend.test/webhook/whatsapp/sec-abc',
+      connectedCallbackUrl: 'https://backend.test/webhook/zapi-status/sec-abc',
+      disconnectedCallbackUrl: 'https://backend.test/webhook/zapi-status/sec-abc',
     })
     expect(updatePayload).toEqual({
       zapi_instance_id: 'inst-1',
@@ -242,7 +242,7 @@ describe('provisionZapi', () => {
   it('é idempotente quando já está conectado — não recria nada', async () => {
     getUserByIdMock.mockResolvedValueOnce(CONFIRMED)
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'connected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1' }, error: null },
+      { data: { zapi_status: 'connected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1', webhook_secret: 'sec-abc' }, error: null },
     ])
 
     const result = await provisionZapi('tenant-1', 'user-1')
@@ -256,7 +256,7 @@ describe('provisionZapi', () => {
   it('reaproveita instância existente em awaiting_qr e só rebusca o QR', async () => {
     getUserByIdMock.mockResolvedValueOnce(CONFIRMED)
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'awaiting_qr', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1' }, error: null },
+      { data: { zapi_status: 'awaiting_qr', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1', webhook_secret: 'sec-abc' }, error: null },
     ])
     getQrMock.mockResolvedValueOnce({ value: 'qr-2' })
 
@@ -273,7 +273,7 @@ describe('provisionZapi', () => {
     queueFromResponses(
       fromMock,
       [
-        { data: { zapi_status: 'disconnected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1' }, error: null },
+        { data: { zapi_status: 'disconnected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1', webhook_secret: 'sec-abc' }, error: null },
         { data: null, error: null },
       ],
       [undefined, (p) => (setStatusPayload = p as Record<string, unknown>)],
@@ -291,7 +291,7 @@ describe('provisionZapi', () => {
     silenceConsole()
     getUserByIdMock.mockResolvedValueOnce(CONFIRMED)
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null }, error: null },
+      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null, webhook_secret: 'sec-abc' }, error: null },
     ])
     createInstanceMock.mockRejectedValueOnce(new ZapiError('boom', 500, '/instances', 'oops'))
 
@@ -303,7 +303,7 @@ describe('provisionZapi', () => {
     silenceConsole()
     getUserByIdMock.mockResolvedValueOnce(CONFIRMED)
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null }, error: null },
+      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null, webhook_secret: 'sec-abc' }, error: null },
       { data: null, error: null },
     ])
     createInstanceMock.mockResolvedValueOnce({ id: 'inst-1', token: 'tok-1', due: 1 })
@@ -317,7 +317,7 @@ describe('provisionZapi', () => {
     delete process.env.BACKEND_PUBLIC_URL
     getUserByIdMock.mockResolvedValueOnce(CONFIRMED)
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null }, error: null },
+      { data: { zapi_status: 'not_provisioned', zapi_instance_id: null, zapi_instance_token: null, webhook_secret: 'sec-abc' }, error: null },
     ])
 
     await expect(provisionZapi('tenant-1', 'user-1')).rejects.toMatchObject({ status: 500, code: 'SERVER_MISCONFIGURED' })
@@ -332,7 +332,7 @@ describe('provisionZapi', () => {
 describe('getConnectionStatus', () => {
   it('em awaiting_qr devolve status + QR fresco', async () => {
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'awaiting_qr', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1' }, error: null },
+      { data: { zapi_status: 'awaiting_qr', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1', webhook_secret: 'sec-abc' }, error: null },
     ])
     getQrMock.mockResolvedValueOnce({ value: 'qr-x' })
 
@@ -341,7 +341,7 @@ describe('getConnectionStatus', () => {
 
   it('em connected devolve status sem QR', async () => {
     queueFromResponses(fromMock, [
-      { data: { zapi_status: 'connected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1' }, error: null },
+      { data: { zapi_status: 'connected', zapi_instance_id: 'inst-1', zapi_instance_token: 'tok-1', webhook_secret: 'sec-abc' }, error: null },
     ])
     expect(await getConnectionStatus('tenant-1')).toEqual({ zapiStatus: 'connected', qrCode: null })
     expect(getQrMock).not.toHaveBeenCalled()
@@ -349,7 +349,7 @@ describe('getConnectionStatus', () => {
 
   it('zapi_status nulo vira not_provisioned', async () => {
     queueFromResponses(fromMock, [
-      { data: { zapi_status: null, zapi_instance_id: null, zapi_instance_token: null }, error: null },
+      { data: { zapi_status: null, zapi_instance_id: null, zapi_instance_token: null, webhook_secret: 'sec-abc' }, error: null },
     ])
     expect(await getConnectionStatus('tenant-1')).toEqual({ zapiStatus: 'not_provisioned', qrCode: null })
   })

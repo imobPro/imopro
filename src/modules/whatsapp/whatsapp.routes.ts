@@ -1,12 +1,31 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
+import { requireWebhookSecret } from '../../shared/middleware/webhook-secret'
 import { receiveWebhook, webhookHealth } from './whatsapp.controller'
 
 const router = Router()
 
-// Sem requireZapiToken: as instâncias provisionadas via Partner API não recebem
-// o ZAPI_CLIENT_TOKEN compartilhado. A autenticação é por posse do instanceId
-// (resolveTenantByInstance no controller) — mesmo padrão de /webhook/zapi-status.
+// Rate limit por secret (chave = valor do path). Um tenant realista não recebe
+// 120 msgs/min pelo mesmo número — cap protege contra abuso de custo Claude
+// caso um secret vaze antes de ser rotacionado.
+const perSecretLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  keyGenerator: (req) => {
+    const s = req.params.secret
+    if (typeof s === 'string' && s.length > 0) return s
+    return req.ip ?? 'unknown'
+  },
+})
+
+// Rota autenticada por secret no path (achados #1/#2 da auditoria de segurança).
+router.post('/whatsapp/:secret', perSecretLimiter, requireWebhookSecret, receiveWebhook)
+
+// Rota legacy sem :secret — mantida durante a janela de deploy para permitir
+// rotação de callbacks na Z-API (/update-every-webhooks). REMOVER após todos
+// os tenants apontarem para a URL nova.
 router.post('/whatsapp', receiveWebhook)
+
 router.get('/health', webhookHealth)
 
 export { router as whatsappRouter }
