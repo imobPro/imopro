@@ -271,4 +271,15 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-08-12] — TRIAL_MESSAGE_LIMIT protege o tenant, não protege o custo por lead
+
+**Contexto:** Etapa 2 da auditoria (achado #7). `TRIAL_MESSAGE_LIMIT=50` na Fase 3 é um cap por **tenant** durante o trial. Fora do trial (status `active` da subscription), nenhum limite por lead individual. Um único número de WhatsApp abusivo — bot, celular comprometido, teste automatizado do próprio corretor — pode disparar milhares de mensagens/dia, cada uma virando 1 chamada Sonnet + possivelmente 1 Whisper. Custo real da Anthropic/OpenAI vai junto.
+**O que estava errado:** Rate limit existia só na porta de entrada do webhook (`webhookLimiter = 600/min POR IP` no `index.ts`). A Z-API distribui webhooks de vários IPs próprios, então o cap efetivo é bem mais alto na prática. E não havia NENHUM freio por (tenant, phone) — o cliente paga a Anthropic pela conversa fake que o atacante forçou. Contra-argumento comum: "mas o TRIAL_MESSAGE_LIMIT existe" — sim, mas só durante os 7 dias iniciais; assinantes ativos ficavam expostos.
+**Como achei:** Etapa 1 da auditoria, T6 do `auditoria-seguranca.md`. Ao mapear a superfície de custo, o único cap era global-por-IP no webhook, o que não protege contra ataque distribuído nem contra um lead específico dentro do tráfego legítimo do tenant.
+**O que foi corrigido:** `incrementDailyLeadMessageCount(tenantId, phone)` em `whatsapp.service.ts` — `INCR` atômico numa chave `daily_msg:{tenant}:{phone}`, com TTL de 24h setado só na primeira mensagem do dia (sliding window por lead, sem cron). Cap default 100 msgs/dia por lead, ajustável via `DAILY_MESSAGE_CAP_PER_LEAD`. Aplicado no worker no gate 2d, junto de trial/agentActive/zapi-disconnected: ao estourar cai em `silenceAndSave` — mensagem vai para o painel do corretor, mas Claude não é chamada. Falha de Redis é permissiva (count fica 0, cap não bloqueia — não derrubar atendimento por falha de infra é padrão do worker inteiro). 6 testes em `daily-cap.test.ts`.
+**Regra para não repetir:** Todo caminho que chega em API paga por unidade (Anthropic, OpenAI, Z-API por mensagem, etc.) precisa de DOIS caps independentes: por tenant (proteção do plano/billing) E por identidade do lead/usuário externo (proteção contra abuso individual). Cap global por IP não substitui nenhum dos dois. Ao adicionar uma nova integração cobrada por uso, perguntar: "quem paga esta chamada, e quem pode disparar quantas por dia sem controle?"
+**Pergunta de verificação:** "Qualquer código novo que eu tocei chama Anthropic/OpenAI/Whisper/outra API paga por uso? Se sim, existe cap por tenant E cap por identidade externa (phone do lead, IP do usuário, ID do webhook) antes da chamada?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

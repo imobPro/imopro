@@ -15,6 +15,8 @@ import {
   buildCorretorAlert,
   buildHandoffTimeoutResumeMessage,
   sendTextOnce,
+  incrementDailyLeadMessageCount,
+  getDailyMessageCapPerLead,
 } from './whatsapp.service'
 import { runOnce } from '../../shared/queue/idempotency'
 import { generateResponse } from '../ai-engine'
@@ -279,6 +281,24 @@ export async function processWhatsAppJob(
         console.error(`[Worker] Falha ao enviar mensagem de horário | ${msg}`)
       }
     }
+    return
+  }
+
+  // 2d. Cap de mensagens por lead/dia — defesa de custo Claude API contra spam.
+  // Um único lead pode disparar milhares de msgs/dia (bot, número comprometido).
+  // Cada uma vira 1 Sonnet + possivelmente 1 Whisper. Ao estourar: silêncio
+  // como nos demais gates. Falha de Redis é permissiva (count=0 fictício).
+  let dailyCount = 0
+  try {
+    dailyCount = await incrementDailyLeadMessageCount(tenantId, phone)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`[Worker] incrementDailyLeadMessageCount falhou — cap ignorado | ${msg}`)
+  }
+  const dailyCap = getDailyMessageCapPerLead()
+  if (dailyCount > dailyCap) {
+    console.log(`[Worker] Cap diário do lead estourado | tenant=${tenantId} phone=${maskPhone(phone)} count=${dailyCount} cap=${dailyCap} — IA em silêncio`)
+    await silenceAndSave(data, pendingMessages, `daily_cap=${dailyCap}`)
     return
   }
 

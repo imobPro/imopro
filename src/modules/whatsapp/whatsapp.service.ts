@@ -19,6 +19,14 @@ import type {
 const DEBOUNCE_DELAY_MS = 8000
 const PENDING_TTL_SECONDS = 300 // 5 minutos
 const SEEN_MESSAGE_TTL_SECONDS = 24 * 60 * 60 // 24h
+const DAILY_MESSAGE_TTL_SECONDS = 24 * 60 * 60 // 24h — sliding window por primeira msg do dia
+const DEFAULT_DAILY_MESSAGE_CAP = 100
+
+export function getDailyMessageCapPerLead(): number {
+  const raw = process.env.DAILY_MESSAGE_CAP_PER_LEAD
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_DAILY_MESSAGE_CAP
+}
 
 // ---------------------------------------------------------------------------
 // Idempotência por messageId — dedup pré-fila
@@ -33,6 +41,33 @@ export async function markMessageSeen(tenantId: string, messageId: string): Prom
   const key = `seen_msg:${tenantId}:${messageId}`
   const result = await redisConnection.set(key, '1', 'EX', SEEN_MESSAGE_TTL_SECONDS, 'NX')
   return result === 'OK'
+}
+
+// ---------------------------------------------------------------------------
+// Cap de mensagens por lead/dia — defesa de custo Claude API contra spam
+// ---------------------------------------------------------------------------
+// Um único lead pode disparar milhares de mensagens/dia (bot, número
+// comprometido, teste automatizado). Cada uma vira 1 chamada Claude Sonnet +
+// possivelmente 1 Whisper — custo real. TRIAL_MESSAGE_LIMIT é por tenant, não
+// resolve o caso de um lead abusivo dentro do plano `active`.
+//
+// Estratégia: INCR atômico em contador por (tenant, phone). TTL vira sliding
+// window de 24h — reset natural sem cron. Ao atingir o cap, a IA silencia e a
+// mensagem cai em saveIncomingMessagesOnly (o corretor ainda vê no painel).
+
+export async function incrementDailyLeadMessageCount(
+  tenantId: string,
+  phone: string,
+): Promise<number> {
+  const key = `daily_msg:${tenantId}:${phone}`
+  const count = await redisConnection.incr(key)
+  // Set TTL só na primeira mensagem do dia — chamadas subsequentes preservam
+  // a janela original. Se INCR falhar (Redis fora) o worker segue sem cap,
+  // por design permissivo (não bloquear atendimento por falha de infra).
+  if (count === 1) {
+    await redisConnection.expire(key, DAILY_MESSAGE_TTL_SECONDS)
+  }
+  return count
 }
 
 // ---------------------------------------------------------------------------
