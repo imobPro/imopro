@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import rateLimit from 'express-rate-limit'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 import { requireAuth } from '../../shared/middleware/auth'
 import { requireWebhookSecret } from '../../shared/middleware/webhook-secret'
 import {
@@ -27,7 +27,7 @@ const statusPerSecretLimiter = rateLimit({
   keyGenerator: (req) => {
     const s = req.params.secret
     if (typeof s === 'string' && s.length > 0) return s
-    return req.ip ?? 'unknown'
+    return ipKeyGenerator(req.ip ?? '')
   },
 })
 

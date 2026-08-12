@@ -238,4 +238,15 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-08-12] — Identificador único tratado como segredo em webhook público
+
+**Contexto:** Etapa 2 da auditoria de segurança (achados #1 e #2). O Sprint 9.6 autenticava `/webhook/whatsapp` e `/webhook/zapi-status` por "posse do `instanceId` da Z-API". Comentário no `whatsapp.routes.ts` chamava explicitamente isso de "segredo".
+**O que estava errado:** `instanceId` nunca foi um segredo por design — fica em cleartext em `tenants.zapi_instance_id`, aparece em painéis administrativos, é imutável, e nada impede que apareça em log ou traceback. Quem descobrisse um `instanceId` conseguia injetar mensagens falsas no log da conversa do tenant, disparar `ConnectedCallback` (queimando o trial de 7 dias) e forçar respostas pagas da Claude API para telefones arbitrários. A Z-API não oferece HMAC nem assinatura nos webhooks inbound (confirmado em `developer.z-api.io`) — o único meio de defesa é adicionar um secret no path da URL de callback.
+**Como achei:** Auditoria de segurança Etapa 1 (prompt `auditoria-seguranca.md`) — rodei o T7 pedindo pra listar toda checagem no endpoint público de webhook. O comentário da rota admitindo o modelo frágil apareceu direto.
+**O que foi corrigido:** Migration 013 adiciona `tenants.webhook_secret` (32 bytes random hex, UNIQUE, NOT NULL, backfill via `gen_random_bytes`). Middleware `requireWebhookSecret` faz lookup por essa coluna e popula `req.webhookTenant`. Rotas novas `/whatsapp/:secret` e `/zapi-status/:secret` usam o middleware + rate limit por secret. `onboarding.service.provisionZapi` inclui o secret nos `receivedCallbackUrl`/`connectedCallbackUrl`. Defesa em profundidade no controller: se o payload traz `instanceId` diferente do que está gravado no tenant resolvido pelo secret, responde 401 `INSTANCE_MISMATCH`. Guarda mecânica em `src/tests/webhook-secret.test.ts` (4 casos: sem secret, curto, spoofing cross-tenant, sucesso).
+**Regra para não repetir:** Identificador (mesmo UUID longo) ≠ segredo. Segredo tem 4 propriedades: (1) só aparece em headers/paths autenticados, (2) nunca é reutilizado como PK/FK/label, (3) é rotacionável sem trocar identidade, (4) é gerado com CSPRNG e sem semântica no valor. Ao adicionar qualquer endpoint público que dependa de "o cliente sabe X", perguntar antes: "esse X aparece em algum outro lugar do sistema além do canal autenticado?" — se sim, não é segredo, é etiqueta.
+**Pergunta de verificação:** "Alguma rota que eu criei/modifiquei aceita input público (webhook, callback, share link, iframe embed) autenticada apenas por um identificador que também é usado como chave estrangeira, aparece em URL de outra callback, ou é armazenado em cleartext em coluna comum?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->
