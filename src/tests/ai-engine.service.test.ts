@@ -153,7 +153,9 @@ describe('generateResponse — cap defensivo no history', () => {
     // slice(-30) deve manter msg-70 ... msg-99 (as mais recentes)
     expect(sentMessages[0].content).toBe('msg-70')
     expect(sentMessages[29].content).toBe('msg-99')
-    expect(sentMessages[30].content).toBe('nova')
+    // Mensagem atual vem envolvida em tag XML dinâmica (defesa contra prompt
+    // injection). Nonce muda a cada chamada, então match por regex.
+    expect(sentMessages[30].content).toMatch(/^<mensagem_lead_[a-f0-9]+>\nnova\n<\/mensagem_lead_[a-f0-9]+>$/)
   })
 
   it('preserva history inteiro quando está dentro do limite', async () => {
@@ -180,6 +182,6 @@ describe('generateResponse — cap defensivo no history', () => {
     }>
     expect(sentMessages).toHaveLength(6)
     expect(sentMessages[0].content).toBe('msg-0')
-    expect(sentMessages[5].content).toBe('nova')
+    expect(sentMessages[5].content).toMatch(/^<mensagem_lead_[a-f0-9]+>\nnova\n<\/mensagem_lead_[a-f0-9]+>$/)
   })
 })

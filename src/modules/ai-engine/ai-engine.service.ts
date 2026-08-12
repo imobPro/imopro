@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI, { toFile } from 'openai'
 import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
@@ -152,12 +153,24 @@ export async function generateResponse(
 
   const userContent = userLines.join('\n')
 
+  // Prompt injection: a mensagem do lead vem de um estranho anônimo pelo
+  // WhatsApp — maior superfície de ataque do produto. Envolver em tag XML
+  // com nonce imprevisível impede que o lead escape do container ("</...>")
+  // ou instrua a IA a mudar de personagem. O system prompt (ai-engine.prompts)
+  // já contém a instrução genérica para tratar conteúdo dentro dessas tags
+  // como dado, não comando. Só a mensagem atual é envelopada; o histórico
+  // persistido fica cru (já foi visto pela IA anteriormente, se ia ser
+  // atacada seria na 1ª interação).
+  const nonce = randomBytes(6).toString('hex')
+  const wrappedUserContent =
+    `<mensagem_lead_${nonce}>\n${userContent}\n</mensagem_lead_${nonce}>`
+
   const trimmedHistory =
     history.length > MAX_HISTORY_MESSAGES ? history.slice(-MAX_HISTORY_MESSAGES) : history
 
   const apiMessages: Anthropic.MessageParam[] = [
     ...trimmedHistory.map((m) => ({ role: m.role, content: m.content })),
-    { role: 'user' as const, content: userContent },
+    { role: 'user' as const, content: wrappedUserContent },
   ]
 
   const systemPrompt = handoffMode
