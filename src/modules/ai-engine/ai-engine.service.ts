@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI, { toFile } from 'openai'
 import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
+import { maskPhone } from '../../shared/utils/pii'
 import { buildSystemPrompt, buildHandoffPreparatorySystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
@@ -166,7 +167,7 @@ export async function generateResponse(
   addExternalCallBreadcrumb({
     service: 'anthropic',
     operation: handoffMode ? 'messages.create (handoff)' : 'messages.create',
-    data: { tenantId, phone, model: MODEL, historyLen: trimmedHistory.length },
+    data: { tenantId, phone: maskPhone(phone), model: MODEL, historyLen: trimmedHistory.length },
   })
 
   let rawText: string
@@ -182,7 +183,7 @@ export async function generateResponse(
     rawText = block?.type === 'text' ? block.text : ''
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[AI] Falha ao gerar resposta | tenant=${tenantId} phone=${phone} erro=${msg}`)
+    console.error(`[AI] Falha ao gerar resposta | tenant=${tenantId} phone=${maskPhone(phone)} erro=${msg}`)
     throw err
   }
 
@@ -192,11 +193,11 @@ export async function generateResponse(
   // Em handoffMode descartamos qualquer marker [TRANSFER:] que a IA tenha incluído por engano —
   // o lead já está em handoff, novo pedido seria duplicidade.
   if (handoffMode) {
-    console.log(`[AI] Resposta gerada (handoff) | tenant=${tenantId} phone=${phone} intent=${intent}`)
+    console.log(`[AI] Resposta gerada (handoff) | tenant=${tenantId} phone=${maskPhone(phone)} intent=${intent}`)
     return { text: parsed.cleanText, intent, shouldTransfer: false }
   }
 
-  console.log(`[AI] Resposta gerada | tenant=${tenantId} phone=${phone} intent=${intent} transfer=${parsed.shouldTransfer}`)
+  console.log(`[AI] Resposta gerada | tenant=${tenantId} phone=${maskPhone(phone)} intent=${intent} transfer=${parsed.shouldTransfer}`)
 
   return {
     text: parsed.cleanText,

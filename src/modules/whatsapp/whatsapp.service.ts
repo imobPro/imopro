@@ -4,6 +4,7 @@ import { redisConnection } from '../../shared/queue/redis'
 import { runOnce } from '../../shared/queue/idempotency'
 import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
 import { getNextBusinessDay, type BusinessHoursConfig } from '../../shared/utils/business-hours'
+import { maskPhone } from '../../shared/utils/pii'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
 import type { PendingMessage } from '../ai-engine/ai-engine.types'
 import type {
@@ -313,7 +314,7 @@ export async function sendTextOnce(
   addExternalCallBreadcrumb({
     service: 'zapi',
     operation: `sendText:${label}`,
-    data: { phone: payload.phone, jobId },
+    data: { phone: maskPhone(payload.phone), jobId },
   })
   const result = await runOnce(jobId, `sendText:${label}`, () => zapi.sendText(payload))
   return result.ran

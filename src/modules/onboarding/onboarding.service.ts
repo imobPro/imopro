@@ -1,5 +1,6 @@
 import { supabase } from '../../shared/database/supabase'
 import { HttpError } from '../../shared/errors/http-error'
+import { maskEmail } from '../../shared/utils/pii'
 import { createInstance, getQrCodeImage, ZapiError } from '../../shared/zapi/client'
 import type { ZapiCreateInstanceResult, ZapiInstanceCredentials } from '../../shared/zapi/zapi.types'
 import { startTrialClock } from '../billing'
@@ -58,7 +59,7 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
         'Este e-mail já tem uma conta. Faça login ou recupere a senha.',
       )
     }
-    console.error(`[Onboarding] createUser falhou email=${email}: ${msg}`)
+    console.error(`[Onboarding] createUser falhou email=${maskEmail(email)}: ${msg}`)
     throw new HttpError(500, 'SIGNUP_FAILED', 'Não foi possível criar a conta')
   }
   const userId = created.user.id
@@ -77,7 +78,7 @@ export async function signup(input: SignupInput): Promise<SignupResult> {
     .single()
 
   if (tenantErr || !tenantRow) {
-    console.error(`[Onboarding] insert tenant falhou email=${email}: ${tenantErr?.message ?? 'sem dados'}`)
+    console.error(`[Onboarding] insert tenant falhou email=${maskEmail(email)}: ${tenantErr?.message ?? 'sem dados'}`)
     await rollbackUser(userId)
     throw new HttpError(500, 'SIGNUP_FAILED', 'Não foi possível criar a conta')
   }

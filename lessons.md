@@ -249,4 +249,15 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-08-12] — PII em log = LGPD tácito, e não aparece em audit até vazar
+
+**Contexto:** Etapa 2 da auditoria de segurança (achados #4 e #5). Varredura no `src/` encontrou ~30 `console.log/error/warn` com `phone=${phone}` (worker do WhatsApp, IA engine) e `email=${email}` (onboarding). Um `addExternalCallBreadcrumb` do Sentry também mandava `phone` cru no `data`.
+**O que estava errado:** Telefone e e-mail são dado pessoal (LGPD Art. 5, I). Cada `console.*` no backend do Railway vai pra stdout, que fica retido no plano do Railway e é acessível a qualquer um com acesso ao projeto. Breadcrumbs do Sentry só sobem quando há exceção, mas quando sobem levam `phone` junto — e a retenção do Sentry é 30/90 dias. O problema não aparece em nenhum teste porque "loga" não é bug funcional; só vira dor quando (1) alguém abre logs do Railway na frente de um cliente/investidor, (2) chega um pedido de titular LGPD e você tem que provar que não armazena PII em log, ou (3) o transbordo do Sentry pra Slack/e-mail vaza a PII pra outro sistema.
+**Como achei:** Etapa 1 da auditoria, T8 do `auditoria-seguranca.md` — pedi pra listar todo `console.*` com nome de campo pessoal. O grep entregou direto.
+**O que foi corrigido:** Helper `src/shared/utils/pii.ts` com `maskPhone` (preserva 5 primeiros e 4 últimos dígitos: `55219****7777`) e `maskEmail` (1ª + última letra do local + domínio inteiro: `a***r@example.com`). Aplicado nos ~30 call sites de `whatsapp.worker.ts`, `ai-engine.service.ts`, `whatsapp.service.ts` (breadcrumb Sentry) e `onboarding.service.ts`. Testes unitários em `src/tests/pii.test.ts` cobrem null/vazio/curto/invalido — se alguém "melhorar" o helper e afrouxar mascaramento, o teste avisa. O `phone` cru continua sendo passado normalmente para `sendText`, `redis.set` de chaves internas e job data — só o log é sanitizado.
+**Regra para não repetir:** Nenhum `console.log/error/warn` do backend pode ter template literal contendo variável que carregue PII (`phone`, `email`, CPF, nome completo, endereço). Sempre mascarar com helper de `shared/utils/pii.ts`. Regra vale também para `addExternalCallBreadcrumb` e qualquer `Sentry.setContext/setTag/setUser` — Sentry é sistema externo, retenção fora do nosso controle. Quando criar log novo, perguntar: "essa variável, se aparecer em stdout do Railway ou no painel do Sentry, expõe titular?"
+**Pergunta de verificação:** "Algum `console.*` ou breadcrumb/context do Sentry que eu adicionei/toquei interpola diretamente uma variável do tipo `phone`, `email`, `cpf`, `nome`, `endereço` (ou qualquer campo que identifique pessoa natural) sem passar por um helper de máscara?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

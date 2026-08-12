@@ -4,6 +4,7 @@ import { redisConnection } from '../../shared/queue/redis'
 import { withJobMonitoring } from '../../shared/observability/sentry'
 import { WHATSAPP_QUEUE_NAME } from '../../shared/queue/queues'
 import { buildScheduleFromTenant, isWithinBusinessHours } from '../../shared/utils/business-hours'
+import { maskPhone } from '../../shared/utils/pii'
 import {
   detectLeadProfile,
   shouldTransferToHuman,
@@ -82,7 +83,7 @@ async function scheduleHandoffCheck(
     }
   )
 
-  console.log(`[Worker] Handoff agendado | tenant=${data.tenantId} phone=${data.phone} check=15min`)
+  console.log(`[Worker] Handoff agendado | tenant=${data.tenantId} phone=${maskPhone(data.phone)} check=15min`)
 }
 
 async function isHandoffActive(tenantId: string, phone: string): Promise<boolean> {
@@ -158,7 +159,7 @@ async function alertCorretor(
   if (!zapi) return
   const target = await getHandoffTargetPhone(tenantId, leadId)
   if (!target) {
-    console.warn(`[Handoff] tenant=${tenantId} sem corretor ativo para alertar | lead=${leadPhone}`)
+    console.warn(`[Handoff] tenant=${tenantId} sem corretor ativo para alertar | lead=${maskPhone(leadPhone)}`)
     return
   }
   try {
@@ -167,7 +168,7 @@ async function alertCorretor(
       message: buildCorretorAlert(leadPhone, tenantId),
     })
     if (sent) {
-      console.log(`[Worker] Alerta enviado ao corretor | agent=${target.agentId} phone=${target.phone}`)
+      console.log(`[Worker] Alerta enviado ao corretor | agent=${target.agentId} phone=${maskPhone(target.phone)}`)
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -191,7 +192,7 @@ export async function processWhatsAppJob(
   if (job.name === 'handoff-check') {
     const active = await isHandoffActive(tenantId, phone)
     if (active) {
-      console.log(`[Worker] Corretor não assumiu | tenant=${tenantId} phone=${phone} — IA retoma`)
+      console.log(`[Worker] Corretor não assumiu | tenant=${tenantId} phone=${maskPhone(phone)} — IA retoma`)
       const creds = await getZapiInstanceCredentials(tenantId)
       const zapi = creds ? buildZApiClient(creds.instanceId, creds.instanceToken) : null
       if (zapi) {
@@ -200,27 +201,27 @@ export async function processWhatsAppJob(
             phone,
             message: buildHandoffTimeoutResumeMessage(),
           })
-          if (sent) console.log(`[Worker] Mensagem de retomada enviada | phone=${phone}`)
+          if (sent) console.log(`[Worker] Mensagem de retomada enviada | phone=${maskPhone(phone)}`)
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err)
           console.error(`[Worker] Falha ao enviar mensagem de retomada | ${msg}`)
         }
       }
       await clearHandoff(tenantId, phone)
-      console.log(`[Worker] ALERTA CORRETOR: lead ${phone} (tenant ${tenantId}) sem atendimento após 15min`)
+      console.log(`[Worker] ALERTA CORRETOR: lead ${maskPhone(phone)} (tenant ${tenantId}) sem atendimento após 15min`)
     } else {
-      console.log(`[Worker] Handoff assumido pelo corretor | tenant=${tenantId} phone=${phone}`)
+      console.log(`[Worker] Handoff assumido pelo corretor | tenant=${tenantId} phone=${maskPhone(phone)}`)
     }
     return
   }
 
-  console.log(`[Worker] Processando | tenant=${tenantId} phone=${phone} jobId=${jobId}`)
+  console.log(`[Worker] Processando | tenant=${tenantId} phone=${maskPhone(phone)} jobId=${jobId}`)
 
   // 1. Ler lote de mensagens acumuladas no debounce
   const pendingMessages = await popPendingMessages(tenantId, phone)
 
   if (pendingMessages.length === 0) {
-    console.log(`[Worker] Sem mensagens pendentes | tenant=${tenantId} phone=${phone} — ignorado`)
+    console.log(`[Worker] Sem mensagens pendentes | tenant=${tenantId} phone=${maskPhone(phone)} — ignorado`)
     return
   }
 
@@ -243,14 +244,14 @@ export async function processWhatsAppJob(
   // Mesmo padrão do toggle agentActive=false. subscription=null (caso
   // teoricamente impossível pelo trigger) é permissivo — não bloqueia atendimento.
   if (subscription && !isAccessAllowed(subscription)) {
-    console.log(`[Worker] Acesso bloqueado | tenant=${tenantId} status=${subscription.status} phone=${phone} — IA em silêncio`)
+    console.log(`[Worker] Acesso bloqueado | tenant=${tenantId} status=${subscription.status} phone=${maskPhone(phone)} — IA em silêncio`)
     await silenceAndSave(data, pendingMessages, `subscription=${subscription.status}`)
     return
   }
 
   // 2b. Toggle do agente desligado: salva mensagem do lead, não responde
   if (!settings.agentActive) {
-    console.log(`[Worker] Agente desligado | tenant=${tenantId} phone=${phone} — IA em silêncio`)
+    console.log(`[Worker] Agente desligado | tenant=${tenantId} phone=${maskPhone(phone)} — IA em silêncio`)
     await silenceAndSave(data, pendingMessages, 'agentActive=false')
     return
   }
@@ -260,7 +261,7 @@ export async function processWhatsAppJob(
   // recepção do callback e o processamento da fila. O banner danger no painel
   // (frontend) cobre a UX — cliente vê que precisa reconectar.
   if (zapiStatus === 'disconnected') {
-    console.log(`[Worker] Z-API desconectada | tenant=${tenantId} phone=${phone} — IA em silêncio`)
+    console.log(`[Worker] Z-API desconectada | tenant=${tenantId} phone=${maskPhone(phone)} — IA em silêncio`)
     await silenceAndSave(data, pendingMessages, 'zapi=disconnected')
     return
   }
@@ -272,7 +273,7 @@ export async function processWhatsAppJob(
           phone,
           message: getBusinessHoursMessage(settings.outOfHoursMessage, schedule),
         })
-        if (sent) console.log(`[Worker] Mensagem de fora de horário enviada | phone=${phone}`)
+        if (sent) console.log(`[Worker] Mensagem de fora de horário enviada | phone=${maskPhone(phone)}`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[Worker] Falha ao enviar mensagem de horário | ${msg}`)
@@ -285,7 +286,7 @@ export async function processWhatsAppJob(
   const lastText = [...pendingMessages].reverse().find((m) => m.text)?.text ?? null
   const detectedProfile = lastText ? detectLeadProfile(lastText) : null
   if (detectedProfile) {
-    console.log(`[Worker] Perfil detectado | profile=${detectedProfile} phone=${phone}`)
+    console.log(`[Worker] Perfil detectado | profile=${detectedProfile} phone=${maskPhone(phone)}`)
   }
 
   // 4. Upsert do lead — antecipado para ter leadId disponível nas etapas seguintes
@@ -309,7 +310,7 @@ export async function processWhatsAppJob(
   // 5b. Handoff em curso: usar prompt preparatório, não reabrir transferência nem rodar sentimento.
   // Lead já foi transferido; nesta janela de 15min a IA conduz a espera.
   if (await isHandoffActive(tenantId, phone)) {
-    console.log(`[Worker] Handoff em curso | tenant=${tenantId} phone=${phone} — modo preparatório`)
+    console.log(`[Worker] Handoff em curso | tenant=${tenantId} phone=${maskPhone(phone)} — modo preparatório`)
     const config = buildAgentConfig(settings)
 
     let aiResponse
@@ -329,13 +330,13 @@ export async function processWhatsAppJob(
           phone,
           message: aiResponse.text,
         })
-        if (sent) console.log(`[Worker] Resposta preparatória enviada | phone=${phone}`)
+        if (sent) console.log(`[Worker] Resposta preparatória enviada | phone=${maskPhone(phone)}`)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         console.error(`[Worker] Falha ao enviar resposta preparatória | ${msg}`)
       }
     } else {
-      console.log(`[Worker] [DEV] Resposta IA (handoff) | phone=${phone}\n${aiResponse.text}`)
+      console.log(`[Worker] [DEV] Resposta IA (handoff) | phone=${maskPhone(phone)}\n${aiResponse.text}`)
     }
 
     await recordAiResponseForBilling(subscription, tenantId)
@@ -377,7 +378,7 @@ export async function processWhatsAppJob(
 
   const transferReason = shouldTransferToHuman(context)
   if (transferReason) {
-    console.log(`[Worker] Transferência pré-IA | razão=${transferReason} phone=${phone}`)
+    console.log(`[Worker] Transferência pré-IA | razão=${transferReason} phone=${maskPhone(phone)}`)
     if (transferReason === 'sentimento_negativo') {
       if (zapi) {
         await sendTextOnce(zapi, jobId, 'sentiment_wait_urgent', {
@@ -399,7 +400,7 @@ export async function processWhatsAppJob(
   let currentSentiment: SentimentType = 'neutro'
   if (history.length >= 2) {
     currentSentiment = await analyzeSentiment(history).catch(() => 'neutro' as SentimentType)
-    console.log(`[Worker] Sentimento | sentiment=${currentSentiment} phone=${phone}`)
+    console.log(`[Worker] Sentimento | sentiment=${currentSentiment} phone=${maskPhone(phone)}`)
 
     if (currentSentiment === 'negativo') {
       const alreadyInHandoff = await isHandoffActive(tenantId, phone)
@@ -429,7 +430,7 @@ export async function processWhatsAppJob(
     aiResponse = await generateResponse(pendingMessages, history, config, tenantId, phone)
   } catch {
     const newFailCount = aiFailedAttempts + 1
-    console.error(`[Worker] Falha na IA | tentativa=${newFailCount} phone=${phone}`)
+    console.error(`[Worker] Falha na IA | tentativa=${newFailCount} phone=${maskPhone(phone)}`)
 
     await persistAiFailure(tenantId, lead.id, newFailCount).catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e)
@@ -437,7 +438,7 @@ export async function processWhatsAppJob(
     })
 
     if (newFailCount >= 2) {
-      console.log(`[Worker] Transferência por ia_sem_resposta | phone=${phone}`)
+      console.log(`[Worker] Transferência por ia_sem_resposta | phone=${maskPhone(phone)}`)
       await scheduleHandoffCheck(queue, data)
     }
     return
@@ -451,14 +452,14 @@ export async function processWhatsAppJob(
         message: aiResponse.text,
       })
       if (sent) {
-        console.log(`[Worker] Resposta enviada | phone=${phone} intent=${aiResponse.intent}`)
+        console.log(`[Worker] Resposta enviada | phone=${maskPhone(phone)} intent=${aiResponse.intent}`)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error(`[Worker] Falha ao enviar resposta | ${msg}`)
     }
   } else {
-    console.log(`[Worker] [DEV] Resposta IA | phone=${phone}\n${aiResponse.text}`)
+    console.log(`[Worker] [DEV] Resposta IA | phone=${maskPhone(phone)}\n${aiResponse.text}`)
   }
 
   // 8b. Contabiliza a resposta para o cap do trial (no-op se status != trial)
@@ -466,7 +467,7 @@ export async function processWhatsAppJob(
 
   // 9. Verificar se a IA sinalizou transferência
   if (aiResponse.shouldTransfer) {
-    console.log(`[Worker] Transferência via IA | razão=${aiResponse.transferReason ?? 'desconhecida'} phone=${phone}`)
+    console.log(`[Worker] Transferência via IA | razão=${aiResponse.transferReason ?? 'desconhecida'} phone=${maskPhone(phone)}`)
     await scheduleHandoffCheck(queue, data)
   }
 
