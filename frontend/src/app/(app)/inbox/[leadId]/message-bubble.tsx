@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FileText, MapPin, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { sanitizeMediaUrl } from "@/lib/media";
 import { formatAbsoluteTime } from "@/lib/domain/relative-time";
 import type { ChatMessage } from "@/lib/types/database";
 
@@ -55,19 +56,27 @@ function MessageBody({
   message: ChatMessage;
   isAssistant: boolean;
 }) {
+  // Sanitiza a URL antes de renderizar — React não bloqueia javascript: / data:
+  // em src/href, só emite warning. Se a URL for insegura (scheme não-https,
+  // hostname privado, fora da allowlist), safeUrl vira null e mostramos
+  // placeholder textual em vez do elemento.
+  const safeUrl = sanitizeMediaUrl(message.media_url);
+
   switch (message.type) {
     case "image":
     case "sticker":
       return (
         <div className="flex flex-col gap-1.5">
-          {message.media_url && (
+          {safeUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={message.media_url}
+              src={safeUrl}
               alt={message.content || "Imagem enviada"}
               className="max-w-full rounded-lg"
             />
-          )}
+          ) : message.media_url ? (
+            <p className="text-xs italic text-muted-foreground">Mídia indisponível</p>
+          ) : null}
           {message.content && (
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
           )}
@@ -77,9 +86,11 @@ function MessageBody({
     case "audio":
       return (
         <div className="flex flex-col gap-1.5">
-          {message.media_url && (
-            <AudioPlayer src={message.media_url} isAssistant={isAssistant} />
-          )}
+          {safeUrl ? (
+            <AudioPlayer src={safeUrl} isAssistant={isAssistant} />
+          ) : message.media_url ? (
+            <p className="text-xs italic text-muted-foreground">Áudio indisponível</p>
+          ) : null}
           {message.content && (
             <p
               className={cn(
@@ -94,9 +105,17 @@ function MessageBody({
       );
 
     case "document":
+      if (!safeUrl) {
+        return (
+          <span className="inline-flex items-center gap-2 text-xs italic text-muted-foreground">
+            <FileText className="size-4" />
+            {message.content?.trim() || "Documento indisponível"}
+          </span>
+        );
+      }
       return (
         <a
-          href={message.media_url ?? "#"}
+          href={safeUrl}
           target="_blank"
           rel="noreferrer"
           className={cn(

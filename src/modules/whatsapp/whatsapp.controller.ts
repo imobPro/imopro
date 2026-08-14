@@ -1,6 +1,30 @@
 import { z } from 'zod'
 import type { Request, Response } from 'express'
 import { enqueueMessage, markMessageSeen, resolveTenantByInstance } from './whatsapp.service'
+import { isSafeExternalUrl, safeUrlHost } from '../../shared/utils/safe-url'
+
+// Refinement compartilhado para URLs de mídia (audioUrl, imageUrl, documentUrl,
+// stickerUrl). Se a URL falhar validação (scheme != https, hostname privado,
+// fora da allowlist), o Zod devolve undefined via .catch() em vez de invalidar
+// o payload inteiro — assim uma imagem com caption ainda entra como texto e
+// mídia bloqueada é silenciosamente descartada + logada. O worker já filtra
+// mensagens sem text nem mediaUrl. Nunca retornamos 400: Z-API iria retentar
+// e a URL maliciosa continuaria chegando.
+const safeMediaUrl = z
+  .string()
+  .refine((value) => isSafeExternalUrl(value).ok, {
+    message: 'URL de mídia insegura ou hostname bloqueado',
+  })
+  .optional()
+  .catch((ctx) => {
+    const raw = ctx.value
+    if (typeof raw === 'string' && raw.length > 0) {
+      const check = isSafeExternalUrl(raw)
+      const reason = check.ok ? 'unknown' : check.reason
+      console.warn(`[Webhook] URL de mídia rejeitada | host=${safeUrlHost(raw)} reason=${reason}`)
+    }
+    return undefined
+  })
 
 // ---------------------------------------------------------------------------
 // Schema Zod — valida o payload Z-API em runtime
@@ -20,11 +44,11 @@ const ZApiWebhookSchema = z.object({
   connectedPhone: z.string().optional().default(''),
   // Tipos de mensagem — apenas um presente por payload
   text:     z.object({ message: z.string() }).optional(),
-  audio:    z.object({ audioUrl: z.string(), mimeType: z.string() }).optional(),
-  image:    z.object({ imageUrl: z.string(), mimeType: z.string(), caption: z.string().optional() }).optional(),
-  document: z.object({ documentUrl: z.string(), mimeType: z.string(), fileName: z.string().optional() }).optional(),
+  audio:    z.object({ audioUrl: safeMediaUrl, mimeType: z.string() }).optional(),
+  image:    z.object({ imageUrl: safeMediaUrl, mimeType: z.string(), caption: z.string().optional() }).optional(),
+  document: z.object({ documentUrl: safeMediaUrl, mimeType: z.string(), fileName: z.string().optional() }).optional(),
   location: z.object({ latitude: z.number(), longitude: z.number(), name: z.string().optional(), address: z.string().optional() }).optional(),
-  sticker:  z.object({ stickerUrl: z.string() }).optional(),
+  sticker:  z.object({ stickerUrl: safeMediaUrl }).optional(),
 })
 
 // Eventos Z-API que não são mensagens de usuário — ignorar silenciosamente

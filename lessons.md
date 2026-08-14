@@ -293,4 +293,19 @@ ORDER BY ordinal_position;
 
 ---
 
+## [2026-08-14] — URL externa como string crua = SSRF + XSS + credential leak
+
+**Contexto:** Auditoria de segurança apontou três achados na mesma raiz — `mediaUrl` chegava pelo webhook Z-API como `z.string()` sem validação de host, e era usado tanto no backend (`fetch(mediaUrl)` em `ai-engine.service.ts:72` para transcrever áudio via Whisper) quanto no frontend (`<img src={media_url}>`, `<audio src>`, `<a href>` em `message-bubble.tsx`).
+**O que estava errado:**
+1. **SSRF:** payload malicioso conseguia fazer o backend fetchar `http://127.0.0.1:6379` (Redis), `http://169.254.169.254/latest/meta-data` (metadata AWS/GCP), `http://backend.railway.internal:PORT/` — resultado ia pra Whisper (não vazava direto), mas erros ecoavam URL crua.
+2. **Credential leak:** `console.error(...url=${mediaUrl})` vazava URL Z-API com token de download na query string para stdout / Sentry.
+3. **XSS armazenado no painel:** React não bloqueia `javascript:` ou `data:text/html,...` em `src`/`href` — só emite warning. Corretor clicava no anexo, executava JS no contexto autenticado do painel.
+
+Raiz comum: URL externa não é `string` — é um input hostil que precisa de validação sintática *antes* de qualquer uso.
+**O que foi corrigido:** Defesa em 5 camadas — helper `isSafeExternalUrl` (`src/shared/utils/safe-url.ts`) que rejeita não-https, IPs privados/loopback/link-local, hostnames `localhost`/`.local`/`.internal`/`.localhost`, e opcionalmente aplica `MEDIA_HOST_ALLOWLIST`; wrapper `safeMediaFetch` (`src/shared/utils/safe-media-fetch.ts`) com `redirect: 'manual'` e timeout de 15s; substituição do `fetch` em `ai-engine.service.ts` e log sanitizado só com hostname; refinement Zod no schema do webhook que substitui URL insegura por `undefined` via `.catch()` (Z-API não retenta 400); sanitização espelho no frontend (`frontend/src/lib/media.ts`) aplicada nos 3 call sites de `message-bubble.tsx` com fallback textual. Testes em `src/tests/security/ssrf-guard.test.ts`.
+**Regra para não repetir:** Toda URL que vem de payload externo (webhook, upload, API terceirizada) passa por `isSafeExternalUrl` no backend e `sanitizeMediaUrl` no frontend antes de fetch, render em `src`/`href`, redirect ou log. Nunca `fetch()` cru em URL externa — sempre `safeMediaFetch`. Nunca logar URL crua — só o hostname sanitizado (query string carrega token). Zod `z.string()` para URL externa é insuficiente — precisa de refinement com validação de host.
+**Pergunta de verificação:** "algum arquivo que eu toquei chama `fetch()`, `<img src>`, `<a href>`, `<audio src>` ou `res.redirect()` com URL vinda de payload externo sem passar por `isSafeExternalUrl` / `sanitizeMediaUrl` / `safeMediaFetch`? algum `console.log`/`console.error` interpola URL de mídia crua em vez do hostname?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

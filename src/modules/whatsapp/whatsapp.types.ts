@@ -6,19 +6,23 @@ export interface ZApiTextMessage {
   message: string
 }
 
+// URLs de mídia podem vir undefined quando o webhook Z-API entrega uma URL
+// insegura (scheme != https, hostname privado, fora da MEDIA_HOST_ALLOWLIST):
+// o refinement Zod em whatsapp.controller.ts substitui por undefined em vez
+// de invalidar o payload inteiro. O worker filtra mensagens sem mediaUrl.
 export interface ZApiAudioMessage {
-  audioUrl: string
+  audioUrl?: string
   mimeType: string
 }
 
 export interface ZApiImageMessage {
-  imageUrl: string
+  imageUrl?: string
   mimeType: string
   caption?: string
 }
 
 export interface ZApiDocumentMessage {
-  documentUrl: string
+  documentUrl?: string
   mimeType: string
   fileName?: string
 }
@@ -46,7 +50,7 @@ export interface ZApiWebhookPayload {
   image?: ZApiImageMessage
   document?: ZApiDocumentMessage
   location?: ZApiLocationMessage
-  sticker?: { stickerUrl: string }
+  sticker?: { stickerUrl?: string }
   // Metadados
   isGroup: boolean
   connectedPhone: string // número da instância Z-API

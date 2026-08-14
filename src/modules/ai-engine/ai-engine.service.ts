@@ -3,6 +3,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI, { toFile } from 'openai'
 import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
 import { maskPhone } from '../../shared/utils/pii'
+import { safeMediaFetch, UnsafeUrlError } from '../../shared/utils/safe-media-fetch'
+import { safeUrlHost } from '../../shared/utils/safe-url'
 import { buildSystemPrompt, buildHandoffPreparatorySystemPrompt } from './ai-engine.prompts'
 import type {
   AgentConfig,
@@ -69,9 +71,23 @@ export async function transcribeAudio(
       data: { mimeType },
     })
 
-    const response = await fetch(mediaUrl)
+    // safeMediaFetch valida scheme/hostname antes de disparar a request e
+    // usa redirect: 'manual' para não seguir 3xx (SSRF via redirect). Nunca
+    // logar mediaUrl cru — a query string carrega token de download Z-API.
+    let response: Response
+    try {
+      response = await safeMediaFetch(mediaUrl)
+    } catch (err) {
+      if (err instanceof UnsafeUrlError) {
+        console.warn(`[AI] Áudio ignorado (URL insegura) | host=${safeUrlHost(mediaUrl)} reason=${err.reason}`)
+      } else {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.error(`[AI] Falha ao baixar áudio | host=${safeUrlHost(mediaUrl)} erro=${msg}`)
+      }
+      return null
+    }
     if (!response.ok) {
-      console.error(`[AI] Falha ao baixar áudio | status=${response.status} url=${mediaUrl}`)
+      console.error(`[AI] Falha ao baixar áudio | status=${response.status} host=${safeUrlHost(mediaUrl)}`)
       return null
     }
 
