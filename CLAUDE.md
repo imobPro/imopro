@@ -53,6 +53,43 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 ---
 
+## Quality Gate — travas de segurança
+
+Referência longa em `docs/quality-gate.md`. Resumo obrigatório abaixo.
+
+**Princípio:** instrução depende de atenção; agente cansa. O prumo é verificação mecânica no CI. Se uma regra não tem forma automática de ser checada, ela é esperança, não regra.
+
+### Matriz de risco — define o rito antes da tarefa
+
+| Nível | O que é no ImobPro | Rito |
+|---|---|---|
+| **Alto** | `tenant_id` / RLS / policies, auth e sessão, webhook Z-API, envio de mensagem, Stripe/Asaas, migrations destrutivas, chaves de API | Plan mode + aprovação explícita + teste do comportamento + Arthur lê diff linha a linha |
+| **Médio** | IA/prompts, qualificação, sentimento, escalação 15min/1h, mídia, relatórios | Amostragem: Arthur lê testes e trechos. Merge após CI verde |
+| **Baixo** | UI, formatação, textos, seeds, refactor sem mudança de comportamento | Confia no CI, desde que exista teste cobrindo o fluxo |
+
+Sem teste cobrindo, nada é baixo risco.
+
+### T1–T6 — travas inegociáveis (resumo)
+
+- **T1 · `tenant_id` nunca vem do request.** Só do JWT via `requireAuth` → `req.auth.tenantId`. Nenhuma camada abaixo do middleware lê tenant do body/query/header.
+- **T2 · RLS não protege o backend.** `SUPABASE_SERVICE_ROLE_KEY` bypassa RLS. Backend acessa banco só via `tenantDb(tenantId)` em `src/shared/database/tenant-db.ts` (regra 1 acima). ⏳ Regra ESLint proibindo import cru fica pendente.
+- **T3 · Autorização só existe no backend.** Frontend esconde botão; o backend valida papel do zero em toda rota. Teste: "se o usuário chamar a API direto por curl, funciona?"
+- **T4 · Anti-IDOR.** Toda busca por ID filtra por `tenant_id` na **mesma** query. Recurso alheio retorna 404, não 403. UUID, não sequencial. Rate limit em toda leitura.
+- **T5 · Segredo nunca chega no navegador.** Prefixo `NEXT_PUBLIC_` = vai pro bundle. Proibido para: `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `RESEND_API_KEY`, `WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `SUPABASE_DB_URL`. Guarda mecânica: `src/tests/security/secrets-guard.test.ts`.
+- **T6 · Todo input é hostil, o do lead do WhatsApp mais ainda.** Prompt injection: mensagem envolvida em tag XML com nonce (✅). Cap de custo: 100 msgs/dia por (tenant, phone) (✅). XSS/upload rich: 🟡 auditar antes de Fase 4.
+
+### Definition of Done
+
+- [ ] Risco classificado e rito da matriz cumprido
+- [ ] CI verde — sem exceção manual
+- [ ] Nenhuma T1–T6 violada
+- [ ] Comportamento provado (teste rodando ou passo a passo reproduzível)
+- [ ] Se Arthur corrigiu: registrado no `lessons.md` **com a pergunta de verificação**
+
+No fim de cada tarefa, rodar as perguntas de verificação do `lessons.md` contra o diff antes de dizer "pronto".
+
+---
+
 ## Estrutura de pastas
 
 ```
