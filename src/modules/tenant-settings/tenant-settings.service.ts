@@ -1,4 +1,5 @@
 import { supabase } from '../../shared/database/supabase'
+import { tenantDb } from '../../shared/database/tenant-db'
 import { HttpError } from '../../shared/errors/http-error'
 import {
   VISIBILITY_SECTIONS,
@@ -7,6 +8,12 @@ import {
   type TenantSettingsPatch,
   type VisibilitySection,
 } from './tenant-settings.types'
+
+// Escape hatch legítimo: `tenants` é tabela global endereçada por `id` (não
+// tem `tenant_id`). getTenantSettings e updateTenantSettings usam o cliente
+// cru direto na coluna `id`. As funções de `agents` (visibility, phone) usam
+// tenantDb — agent pertence a exatamente um tenant, então filtrar por
+// tenant_id na mesma query fecha o vetor de escalação horizontal.
 
 const DEFAULTS: Omit<TenantSettings, 'tenantId'> = {
   agentName: 'Assistente',
@@ -199,8 +206,11 @@ function sanitizeVisibility(input: unknown): AgentVisibility {
   return out
 }
 
-export async function getAgentVisibility(agentId: string): Promise<AgentVisibility> {
-  const { data, error } = await supabase
+export async function getAgentVisibility(
+  tenantId: string,
+  agentId: string,
+): Promise<AgentVisibility> {
+  const { data, error } = await tenantDb(tenantId)
     .from('agents')
     .select('settings_visibility')
     .eq('id', agentId)
@@ -210,7 +220,9 @@ export async function getAgentVisibility(agentId: string): Promise<AgentVisibili
     console.error(`[TenantSettings] getAgentVisibility falhou agent=${agentId}: ${error.message}`)
     return {}
   }
-  return sanitizeVisibility(data?.settings_visibility)
+  return sanitizeVisibility(
+    (data as { settings_visibility?: unknown } | null)?.settings_visibility,
+  )
 }
 
 /**
@@ -218,14 +230,15 @@ export async function getAgentVisibility(agentId: string): Promise<AgentVisibili
  * inválidos são ignorados silenciosamente — preferência de UI não justifica 400.
  */
 export async function updateAgentVisibility(
+  tenantId: string,
   agentId: string,
-  patch: AgentVisibility
+  patch: AgentVisibility,
 ): Promise<AgentVisibility> {
-  const current = await getAgentVisibility(agentId)
+  const current = await getAgentVisibility(tenantId, agentId)
   const sanitized = sanitizeVisibility(patch)
   const merged: AgentVisibility = { ...current, ...sanitized }
 
-  const { error } = await supabase
+  const { error } = await tenantDb(tenantId)
     .from('agents')
     .update({ settings_visibility: merged })
     .eq('id', agentId)
@@ -238,8 +251,11 @@ export async function updateAgentVisibility(
   return merged
 }
 
-export async function getAgentPhone(agentId: string): Promise<string | null> {
-  const { data, error } = await supabase
+export async function getAgentPhone(
+  tenantId: string,
+  agentId: string,
+): Promise<string | null> {
+  const { data, error } = await tenantDb(tenantId)
     .from('agents')
     .select('phone')
     .eq('id', agentId)
@@ -249,14 +265,18 @@ export async function getAgentPhone(agentId: string): Promise<string | null> {
     console.error(`[TenantSettings] getAgentPhone falhou agent=${agentId}: ${error.message}`)
     return null
   }
-  return (data?.phone as string | null) ?? null
+  return (data as { phone?: string | null } | null)?.phone ?? null
 }
 
 /**
  * Atualiza o telefone do agent logado. Aceita "+55..." ou só dígitos; persiste
  * apenas dígitos (formato E.164 sem o "+", padrão Z-API).
  */
-export async function updateAgentPhone(agentId: string, phone: string): Promise<string> {
+export async function updateAgentPhone(
+  tenantId: string,
+  agentId: string,
+  phone: string,
+): Promise<string> {
   if (typeof phone !== 'string') {
     throw new HttpError(400, 'INVALID_FIELD', 'Telefone deve ser texto')
   }
@@ -265,7 +285,10 @@ export async function updateAgentPhone(agentId: string, phone: string): Promise<
     throw new HttpError(400, 'INVALID_PHONE', 'Telefone deve ter entre 10 e 15 dígitos')
   }
 
-  const { error } = await supabase.from('agents').update({ phone: digits }).eq('id', agentId)
+  const { error } = await tenantDb(tenantId)
+    .from('agents')
+    .update({ phone: digits })
+    .eq('id', agentId)
   if (error) {
     console.error(`[TenantSettings] updateAgentPhone falhou agent=${agentId}: ${error.message}`)
     throw new HttpError(500, 'UPDATE_FAILED', 'Falha ao salvar telefone')

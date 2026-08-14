@@ -181,7 +181,7 @@ describe('updateAgentVisibility', () => {
       [undefined, (payload) => captures.push(payload)]
     )
 
-    const result = await updateAgentVisibility('agent-1', {
+    const result = await updateAgentVisibility('tenant-1', 'agent-1', {
       brand: false,
       identity: true,
       // chaves inválidas — ignoradas
@@ -195,7 +195,7 @@ describe('updateAgentVisibility', () => {
 
   it('retorna {} quando o agent não tem coluna populada', async () => {
     queueFromResponses(fromMock, [{ data: null, error: null }])
-    const v = await getAgentVisibility('agent-x')
+    const v = await getAgentVisibility('tenant-1', 'agent-x')
     expect(v).toEqual({})
   })
 })
@@ -209,17 +209,17 @@ describe('updateAgentPhone', () => {
     const captures: unknown[] = []
     queueFromResponses(fromMock, [{ data: null, error: null }], [(p) => captures.push(p)])
 
-    const saved = await updateAgentPhone('agent-1', '+55 (21) 98888-7777')
+    const saved = await updateAgentPhone('tenant-1', 'agent-1', '+55 (21) 98888-7777')
 
     expect(saved).toBe('5521988887777')
     expect(captures[0]).toEqual({ phone: '5521988887777' })
   })
 
   it('rejeita telefone curto demais', async () => {
-    await expect(updateAgentPhone('agent-1', '12345')).rejects.toBeInstanceOf(HttpError)
+    await expect(updateAgentPhone('tenant-1', 'agent-1', '12345')).rejects.toBeInstanceOf(HttpError)
   })
 
   it('rejeita tipo não-string', async () => {
-    await expect(updateAgentPhone('agent-1', 123 as unknown as string)).rejects.toBeInstanceOf(HttpError)
+    await expect(updateAgentPhone('tenant-1', 'agent-1', 123 as unknown as string)).rejects.toBeInstanceOf(HttpError)
   })
 })

@@ -38,7 +38,9 @@ app.use(cors({
   credentials: true,
 }))
 
-app.use(express.json())
+// Limit explícito = default do body-parser (100kb). Documenta a decisão
+// de que WhatsApp/Z-API cabem folgado. Trocar exige revisão de DoS.
+app.use(express.json({ limit: '100kb' }))
 
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 100 })
 const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 600 })

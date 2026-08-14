@@ -19,15 +19,18 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
-// pg é opcional hoje — usamos dynamic import pra permitir o skip.
-let pgAvailable = false
-try {
-  await import('pg')
-  pgAvailable = true
-} catch {
-  pgAvailable = false
+// pg é opcional hoje — require.resolve checa existência sincronamente sem
+// carregar o módulo (top-level await não funciona no target CJS do projeto).
+function isPgInstalled(): boolean {
+  try {
+    require.resolve('pg')
+    return true
+  } catch {
+    return false
+  }
 }
 
+const pgAvailable = isPgInstalled()
 const dbUrl = process.env.SUPABASE_DB_URL
 const shouldRun = pgAvailable && !!dbUrl && dbUrl !== 'redis://localhost:6379'
 

@@ -1,4 +1,4 @@
-import { supabase } from '../../shared/database/supabase'
+import { tenantDb } from '../../shared/database/tenant-db'
 import { sendEmail } from '../../shared/email'
 import type { AgentForReports } from '../agents'
 import { listAgentsForReports } from '../agents'
@@ -46,8 +46,10 @@ export async function generateAndSendReportForAgent(
   const period = buildPeriod(periodType)
   const filePath = buildReportPath(agent.tenantId, agent.agentId, periodType, period.end)
 
+  const db = tenantDb(agent.tenantId)
+
   // Idempotência: se já existe report (mesmo agent+período+end), não regerar
-  const { data: existing } = await supabase
+  const { data: existing } = await db
     .from('reports')
     .select('id, sent_at')
     .eq('agent_id', agent.agentId)
@@ -55,9 +57,12 @@ export async function generateAndSendReportForAgent(
     .eq('period_end', period.end.toISOString().slice(0, 10))
     .maybeSingle()
 
-  if (existing && existing.sent_at) {
+  // tenantDb.from().select() perde a inferência de tipo do supabase-js (retorna
+  // GenericStringError no fallback). Cast local pra recuperar o shape esperado.
+  const existingRow = existing as { id: string; sent_at: string | null } | null
+  if (existingRow?.sent_at) {
     console.log(`[Reports] Já enviado | agent=${agent.agentId} ${periodType}`)
-    return { reportId: existing.id as string, emailId: null }
+    return { reportId: existingRow.id, emailId: null }
   }
 
   // 1. Métricas
@@ -75,12 +80,13 @@ export async function generateAndSendReportForAgent(
   // 3. Upload Storage (upsert: true sobrescreve se já existe)
   await uploadReportPdf(filePath, pdfBuffer)
 
-  // 4. Persiste row em reports (upsert pra cobrir retry)
-  const { data: report, error: insertError } = await supabase
+  // 4. Persiste row em reports (upsert pra cobrir retry). tenantDb injeta
+  // tenant_id no row automaticamente — o `tenant_id: agent.tenantId` explícito
+  // ficaria redundante e sobrescrito pelo wrapper.
+  const { data: report, error: insertError } = await db
     .from('reports')
     .upsert(
       {
-        tenant_id: agent.tenantId,
         agent_id: agent.agentId,
         period_type: periodType,
         period_start: period.start.toISOString().slice(0, 10),
@@ -112,13 +118,13 @@ export async function generateAndSendReportForAgent(
     })
     emailId = sent.id
 
-    await supabase
+    await db
       .from('reports')
       .update({ sent_at: new Date().toISOString(), error: null })
       .eq('id', report.id)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    await supabase.from('reports').update({ error: msg }).eq('id', report.id)
+    await db.from('reports').update({ error: msg }).eq('id', report.id)
     throw err
   }
 
@@ -129,8 +135,11 @@ export async function generateAndSendReportForAgent(
 // Listagem (consumida pela rota GET /api/reports)
 // -----------------------------------------------------------------------------
 
-export async function listReportsForAgent(agentId: string): Promise<Report[]> {
-  const { data, error } = await supabase
+export async function listReportsForAgent(
+  tenantId: string,
+  agentId: string,
+): Promise<Report[]> {
+  const { data, error } = await tenantDb(tenantId)
     .from('reports')
     .select('*')
     .eq('agent_id', agentId)
@@ -142,14 +151,15 @@ export async function listReportsForAgent(agentId: string): Promise<Report[]> {
     return []
   }
 
-  return (data ?? []).map(toReportDomain)
+  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(toReportDomain)
 }
 
 export async function getReportForAgent(
+  tenantId: string,
   agentId: string,
-  reportId: string
+  reportId: string,
 ): Promise<Report | null> {
-  const { data, error } = await supabase
+  const { data, error } = await tenantDb(tenantId)
     .from('reports')
     .select('*')
     .eq('id', reportId)
@@ -160,7 +170,7 @@ export async function getReportForAgent(
     console.error(`[Reports] getReportForAgent falhou: ${error.message}`)
     return null
   }
-  return data ? toReportDomain(data) : null
+  return data ? toReportDomain(data as unknown as Record<string, unknown>) : null
 }
 
 // -----------------------------------------------------------------------------

@@ -1,0 +1,75 @@
+name: Quality Gate
+
+# Portão. Nada entra na main sem passar por aqui.
+# Se está vermelho, não existe "só desta vez" (docs/quality-gate.md).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancela runs antigos do mesmo ref quando um novo push chega.
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  types:
+    name: TypeScript strict
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: tsc --noEmit (zero any)
+        run: npx tsc --noEmit
+
+  tests:
+    name: Vitest (inclui guardas de segurança)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # Roda a suite inteira, incluindo src/tests/security/*. O rls-guard
+      # fica skipped enquanto o repo não tiver SUPABASE_DB_URL configurado
+      # como secret (comportamento igual ao ambiente local).
+      - name: vitest run
+        run: npx vitest run
+
+  segredos:
+    name: Varredura de segredos (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 = histórico completo. Segredo apagado no commit
+          # seguinte continua no passado — sem isso, Gitleaks não vê.
+          fetch-depth: 0
+
+      # Binário direto — evita a licença requerida pelo gitleaks-action em
+      # repos privados de organização. Descobre a última release pela API
+      # do GitHub pra não pinar versão que pode sair de circulação. Falha
+      # o job se algum segredo real aparecer no histórico.
+      - name: Rodar Gitleaks
+        run: |
+          set -euo pipefail
+          VERSION=$(curl -sSL https://api.github.com/repos/gitleaks/gitleaks/releases/latest \
+            | grep '"tag_name"' | head -1 | cut -d '"' -f 4 | sed 's/^v//')
+          echo "Gitleaks v${VERSION}"
+          curl -sSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tar.gz gitleaks
+          ./gitleaks detect --source . --redact --verbose
