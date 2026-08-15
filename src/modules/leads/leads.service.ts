@@ -1,3 +1,8 @@
+// DÍVIDA T6 — arquivo em 351 linhas (teto 300). Ver docs/divida-tecnica.md.
+// Correção: sai junto com o sprint que sobe cobertura de leads (12%→90%) e
+// introduz zod na fronteira. NÃO fatiar por fatiar — o refactor de tipagem
+// e o de organização acontecem no mesmo passe.
+/* eslint-disable max-lines */
 import { supabase } from '../../shared/database/supabase'
 import { captureSilentError } from '../../shared/observability/sentry'
 import type {
@@ -26,6 +31,9 @@ export function calcScoreDelta(intent: IntentType): number {
 export async function upsertLead(params: UpsertLeadParams): Promise<Lead> {
   const now = new Date().toISOString()
 
+  // DÍVIDA T6 — retorno do supabase-js sem Database types tipados. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { data, error } = await supabase
     .from('leads')
     .upsert(
@@ -49,6 +57,9 @@ export async function upsertLead(params: UpsertLeadParams): Promise<Lead> {
 
   if (error) throw new Error(`[Leads] upsertLead falhou: ${error.message}`)
 
+  // DÍVIDA T6 — retorno do supabase-js sem Database types tipados. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   return toLeadDomain(data)
 }
 
@@ -161,6 +172,9 @@ export async function saveConversationMessages(
         last_message_at: now,
         ai_failed_attempts: aiFailedAttempts,
       },
+      // DÍVIDA T6 — literal 'tenant_id,lead_id' repetido 4x no arquivo. Ver docs/divida-tecnica.md.
+      // Correção: extrair para constante junto com o refactor de tipagem do módulo.
+      // eslint-disable-next-line sonarjs/no-duplicate-string
       { onConflict: 'tenant_id,lead_id', ignoreDuplicates: false }
     )
     .select('id')
@@ -168,6 +182,9 @@ export async function saveConversationMessages(
 
   if (convError) throw new Error(`[Leads] upsert conversation falhou: ${convError.message}`)
 
+  // DÍVIDA T6 — retorno do supabase-js sem Database types tipados. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const conversationId: string = conv.id
 
   // 2. Montar bulk de mensagens a inserir
@@ -241,6 +258,9 @@ export async function saveIncomingMessagesOnly(params: {
 
   if (convError) throw new Error(`[Leads] saveIncomingMessagesOnly upsert conversation falhou: ${convError.message}`)
 
+  // DÍVIDA T6 — retorno do supabase-js sem Database types tipados. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const conversationId: string = conv.id
 
   const messagesToInsert = incomingMessages.map((m) => ({
@@ -310,6 +330,9 @@ export async function getConversationHistory(
   leadId: string,
   limit = 20
 ): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {
+  // DÍVIDA T6 — retorno do supabase-js sem Database types tipados. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const { data, error } = await supabase.rpc('get_conversation_history', {
     p_tenant_id: tenantId,
     p_lead_id: leadId,
@@ -325,6 +348,9 @@ export async function getConversationHistory(
     })
     return []
   }
+  // DÍVIDA T6 — data é any (sem Database types). Ver docs/divida-tecnica.md.
+  // Correção: schema zod validando o formato do array. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (!data || data.length === 0) return []
 
   return (data as Array<{ role: string; content: string }>)

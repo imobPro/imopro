@@ -69,14 +69,14 @@ describe('generateResponse — handoffMode', () => {
       content: [{ type: 'text', text: 'Vou conectar você. [TRANSFER:pedido_explicito]' }],
     })
 
-    const response = await generateResponse(
-      [userMessage('quero falar com humano')],
-      [],
-      baseConfig(),
-      'tenant-1',
-      '5521999999999',
-      { handoffMode: true },
-    )
+    const response = await generateResponse({
+      pendingMessages: [userMessage('quero falar com humano')],
+      history: [],
+      config: baseConfig(),
+      tenantId: 'tenant-1',
+      phone: '5521999999999',
+      handoffMode: true,
+    })
 
     expect(response.shouldTransfer).toBe(false)
     expect(response.transferReason).toBeUndefined()
@@ -88,14 +88,14 @@ describe('generateResponse — handoffMode', () => {
       content: [{ type: 'text', text: 'O corretor já foi acionado e vai retornar.' }],
     })
 
-    await generateResponse(
-      [userMessage('quanto custa o apartamento?')],
-      [],
-      baseConfig(),
-      'tenant-1',
-      '5521999999999',
-      { handoffMode: true },
-    )
+    await generateResponse({
+      pendingMessages: [userMessage('quanto custa o apartamento?')],
+      history: [],
+      config: baseConfig(),
+      tenantId: 'tenant-1',
+      phone: '5521999999999',
+      handoffMode: true,
+    })
 
     const sentSystem = messagesCreate.mock.calls[0][0].system as string
     expect(sentSystem).toContain('aguardando o contato')
@@ -107,13 +107,13 @@ describe('generateResponse — handoffMode', () => {
       content: [{ type: 'text', text: 'Vou conectar você. [TRANSFER:pedido_explicito]' }],
     })
 
-    const response = await generateResponse(
-      [userMessage('quero falar com humano')],
-      [],
-      baseConfig(),
-      'tenant-1',
-      '5521999999999',
-    )
+    const response = await generateResponse({
+      pendingMessages: [userMessage('quero falar com humano')],
+      history: [],
+      config: baseConfig(),
+      tenantId: 'tenant-1',
+      phone: '5521999999999',
+    })
 
     expect(response.shouldTransfer).toBe(true)
     expect(response.transferReason).toBe('pedido_explicito')
@@ -136,13 +136,13 @@ describe('generateResponse — cap defensivo no history', () => {
       content: `msg-${i}`,
     }))
 
-    await generateResponse(
-      [userMessage('nova')],
-      longHistory,
-      baseConfig(),
-      'tenant-1',
-      '5521999999999',
-    )
+    await generateResponse({
+      pendingMessages: [userMessage('nova')],
+      history: longHistory,
+      config: baseConfig(),
+      tenantId: 'tenant-1',
+      phone: '5521999999999',
+    })
 
     const sentMessages = messagesCreate.mock.calls[0][0].messages as Array<{
       role: string
@@ -168,13 +168,13 @@ describe('generateResponse — cap defensivo no history', () => {
       content: `msg-${i}`,
     }))
 
-    await generateResponse(
-      [userMessage('nova')],
-      shortHistory,
-      baseConfig(),
-      'tenant-1',
-      '5521999999999',
-    )
+    await generateResponse({
+      pendingMessages: [userMessage('nova')],
+      history: shortHistory,
+      config: baseConfig(),
+      tenantId: 'tenant-1',
+      phone: '5521999999999',
+    })
 
     const sentMessages = messagesCreate.mock.calls[0][0].messages as Array<{
       role: string

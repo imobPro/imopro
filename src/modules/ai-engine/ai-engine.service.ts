@@ -7,11 +7,9 @@ import { safeMediaFetch, UnsafeUrlError } from '../../shared/utils/safe-media-fe
 import { safeUrlHost } from '../../shared/utils/safe-url'
 import { buildSystemPrompt, buildHandoffPreparatorySystemPrompt } from './ai-engine.prompts'
 import type {
-  AgentConfig,
   AIResponse,
-  GenerateResponseOptions,
+  GenerateResponseInput,
   IntentType,
-  PendingMessage,
   TransferReason,
 } from './ai-engine.types'
 
@@ -138,15 +136,9 @@ function parseTransfer(text: string): { cleanText: string; shouldTransfer: boole
   return { cleanText, shouldTransfer: true, transferReason: reason }
 }
 
-export async function generateResponse(
-  pendingMessages: PendingMessage[],
-  history: Array<{ role: 'user' | 'assistant'; content: string }>,
-  config: AgentConfig,
-  tenantId: string,
-  phone: string,
-  options: GenerateResponseOptions = {},
-): Promise<AIResponse> {
-  const handoffMode = options.handoffMode === true
+export async function generateResponse(input: GenerateResponseInput): Promise<AIResponse> {
+  const { pendingMessages, history, config, tenantId, phone } = input
+  const handoffMode = input.handoffMode === true
 
   const userLines: string[] = []
 

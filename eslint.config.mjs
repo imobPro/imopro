@@ -137,15 +137,28 @@ export default tseslint.config(
     rules: { 'no-restricted-imports': 'off' },
   },
 
-  // QUARENTENA até Sprint XX — ciclomática 56, cognitiva 108, cobertura 3,77%.
+  // QUARENTENA (baseline 2026-08-15) — whatsapp.worker.ts.
+  // Números no momento do baseline (ver docs/divida-tecnica.md):
+  //   - complexity:                   processWhatsAppJob = 56    (teto 25)
+  //   - sonarjs/cognitive-complexity: processWhatsAppJob = 108   (teto 20)
+  //   - max-params:                   alertCorretor      = 6     (teto 5)
+  //   - max-lines-per-function:       processWhatsAppJob = 283   (teto 100)
+  //   - max-depth:                    processWhatsAppJob = 5     (teto 4)
+  //   - max-lines (arquivo):          469                        (teto 300)
+  //   - cobertura de linhas:          3,77%
   // Função mais crítica e menos testada do sistema. Refatoração planejada em
-  // docs/divida-tecnica.md. Não estender esta função: qualquer código novo
-  // vai para função separada.
+  // docs/divida-tecnica.md — Sprint dedicado após primeiro cliente pagante.
+  // NÃO ESTENDER esta função: qualquer código novo vai para função separada
+  // chamada por ela; a assinatura de processWhatsAppJob não cresce.
   {
     files: ['src/modules/whatsapp/whatsapp.worker.ts'],
     rules: {
       complexity: 'off',
       'sonarjs/cognitive-complexity': 'off',
+      'max-params': 'off',
+      'max-lines-per-function': 'off',
+      'max-depth': 'off',
+      'max-lines': 'off',
     },
   },
 

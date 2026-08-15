@@ -1,6 +1,5 @@
 import pdfmake from 'pdfmake'
 import type { TDocumentDefinitions } from 'pdfmake/interfaces'
-// @ts-expect-error - subpath sem types em @types/pdfmake; é módulo CJS válido
 import Roboto from 'pdfmake/build/fonts/Roboto'
 import type { ReportMetrics } from './reports.types'
 import type { LeadStatus } from '../leads/leads.types'
@@ -10,15 +9,10 @@ let fontsRegistered = false
 function ensureFonts(): void {
   if (fontsRegistered) return
   // O bundle Roboto exporta { vfs, fonts }. Em Node.js o pdfmake não lê arquivos
-  // do disco — temos que popular o virtualfs com os TTFs (em base64) antes de
-  // registrar o mapa de fontes que aponta para esses nomes.
-  const vfs = Roboto.vfs as Record<string, { data: string }>
-  // pdfmake.virtualfs.writeFileSync existe em runtime mas não está em @types/pdfmake
-  const virtualfs = (pdfmake as unknown as {
-    virtualfs: { writeFileSync: (name: string, data: Buffer) => void }
-  }).virtualfs
-  for (const [filename, payload] of Object.entries(vfs)) {
-    virtualfs.writeFileSync(filename, Buffer.from(payload.data, 'base64'))
+  // do disco — populamos o virtualfs com os TTFs (base64) e registramos o mapa
+  // de fontes. Tipos das duas APIs em src/types/pdfmake.d.ts.
+  for (const [filename, payload] of Object.entries(Roboto.vfs)) {
+    pdfmake.virtualfs.writeFileSync(filename, Buffer.from(payload.data, 'base64'))
   }
   pdfmake.addFonts(Roboto.fonts)
   fontsRegistered = true

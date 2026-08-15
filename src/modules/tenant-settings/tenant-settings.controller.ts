@@ -29,11 +29,17 @@ export async function getSettings(req: Request, res: Response): Promise<void> {
 export async function patchTenant(req: Request, res: Response): Promise<void> {
   const { tenantId } = requireAuth(req)
 
+  // DÍVIDA T6 — payload sem validação de fronteira. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const body = req.body
   if (!body || typeof body !== 'object') {
     throw new HttpError(400, 'INVALID_BODY', 'Body inválido')
   }
 
+  // DÍVIDA T6 — payload sem validação de fronteira. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   const updated = await updateTenantSettings(tenantId, body)
   res.json({ tenant: updated })
 }
@@ -41,11 +47,17 @@ export async function patchTenant(req: Request, res: Response): Promise<void> {
 export async function patchVisibility(req: Request, res: Response): Promise<void> {
   const { tenantId, agentId } = requireAuth(req)
 
+  // DÍVIDA T6 — payload sem validação de fronteira. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const body = req.body
   if (!body || typeof body !== 'object') {
     throw new HttpError(400, 'INVALID_BODY', 'Body inválido')
   }
 
+  // DÍVIDA T6 — payload sem validação de fronteira. Ver docs/divida-tecnica.md.
+  // Correção: schema zod na entrada. NÃO resolver com `as Tipo`.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
   const visibility = await updateAgentVisibility(tenantId, agentId, body)
   res.json({ visibility })
 }

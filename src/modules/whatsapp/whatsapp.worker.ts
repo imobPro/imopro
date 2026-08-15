@@ -335,7 +335,12 @@ export async function processWhatsAppJob(
 
     let aiResponse
     try {
-      aiResponse = await generateResponse(pendingMessages, history, config, tenantId, phone, {
+      aiResponse = await generateResponse({
+        pendingMessages,
+        history,
+        config,
+        tenantId,
+        phone,
         handoffMode: true,
       })
     } catch (err) {
@@ -447,7 +452,7 @@ export async function processWhatsAppJob(
 
   let aiResponse
   try {
-    aiResponse = await generateResponse(pendingMessages, history, config, tenantId, phone)
+    aiResponse = await generateResponse({ pendingMessages, history, config, tenantId, phone })
   } catch {
     const newFailCount = aiFailedAttempts + 1
     console.error(`[Worker] Falha na IA | tentativa=${newFailCount} phone=${maskPhone(phone)}`)

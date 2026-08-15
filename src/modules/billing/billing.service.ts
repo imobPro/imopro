@@ -95,10 +95,17 @@ export function isAccessAllowed(sub: Subscription): boolean {
  * não está em trial (RPC retorna NULL nesse caso). Caller usa o número retornado
  * para decidir se atingiu cap e precisa marcar expired.
  */
+// Contrato da RPC (migration 011): retorna INT (nova contagem) ou NULL.
+// Sem Database types tipados no client, tipamos aqui a fronteira do banco.
+interface IncrementTrialCountResult {
+  data: number | null
+  error: { message: string } | null
+}
+
 export async function incrementTrialMessageCount(tenantId: string): Promise<number | null> {
-  const { data, error } = await supabase.rpc('increment_trial_message_count', {
+  const { data, error } = (await supabase.rpc('increment_trial_message_count', {
     p_tenant_id: tenantId,
-  })
+  })) as IncrementTrialCountResult
 
   if (error) {
     console.error(`[Billing] incrementTrialMessageCount falhou tenant=${tenantId}: ${error.message}`)

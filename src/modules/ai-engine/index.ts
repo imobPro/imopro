@@ -3,7 +3,7 @@ export type {
   AgentConfig,
   AIResponse,
   ConversationMessage,
-  GenerateResponseOptions,
+  GenerateResponseInput,
   IntentType,
   PendingMessage,
   TransferReason,

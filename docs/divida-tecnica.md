@@ -10,18 +10,26 @@ Registrado em 2026-08-15 junto com o baseline do Quality Gate.
 
 ## 1. `processWhatsAppJob` — quarentena de complexidade
 
-**Onde:** `src/modules/whatsapp/whatsapp.worker.ts:181`
+**Onde:** `src/modules/whatsapp/whatsapp.worker.ts:181` (função) + arquivo inteiro.
 
 **Números de hoje (2026-08-15):**
-- Complexidade ciclomática: **56** (teto do projeto é 25)
-- Complexidade cognitiva: **108** (teto é 20)
-- Linhas da função: **278** (teto `max-lines-per-function` é 100)
-- Profundidade máxima: **5** (teto `max-depth` é 4)
+- Complexidade ciclomática: **56** (teto do projeto é 25) — `processWhatsAppJob`
+- Complexidade cognitiva: **108** (teto é 20) — `processWhatsAppJob`
+- Parâmetros: **6** (teto `max-params` é 5) — `alertCorretor`
+- Linhas da função: **283** (teto `max-lines-per-function` é 100) — `processWhatsAppJob`
+- Profundidade máxima: **5** (teto `max-depth` é 4) — `processWhatsAppJob`
+- Linhas do arquivo: **469** (teto `max-lines` é 300)
 - Cobertura de linhas: **3,77%**
 
-**Estado:** override em `eslint.config.mjs` desligando `complexity` e
-`sonarjs/cognitive-complexity` apenas neste arquivo. O comentário do override
+**Estado:** override em `eslint.config.mjs` desligando `complexity`,
+`sonarjs/cognitive-complexity`, `max-params`, `max-lines-per-function`,
+`max-depth` e `max-lines` **apenas neste arquivo**. O comentário do override
 tem os números acima e o ponteiro para este documento.
+
+**Por que o override e não fix inline:** a quarentena existe porque nenhuma
+das 6 métricas do worker é resolvível em isolado — todas caem juntas no
+sprint dedicado de refatoração. Silenciar por linha mascararia o problema
+real (função monolítica) por trás de dezenas de `eslint-disable` espalhados.
 
 **Por que existe:** função que orquestra o pipeline inteiro — debounce, IA,
 mídia, handoff, persistência, envio, transferência a corretor. Nasceu grande
@@ -150,14 +158,23 @@ arquivo em 0% convivendo com outro em 90%+.
 
 ## 6. unsafe-any em fronteira de entrada
 
+**Estado:** marcado no código via `// eslint-disable-next-line` por linha,
+cada disable acompanhado do bloco `DÍVIDA T6 — … Ver docs/divida-tecnica.md.
+Correção: schema zod na entrada. NÃO resolver com` `as Tipo`. Nada de
+disable no topo do arquivo — a intenção é que doer ler o código lembre da
+dívida.
+
 **Onde:**
-- `src/modules/tenant-settings/tenant-settings.controller.ts` (4 ocorrências:
-  L32, L37, L44, L49) — payload de request sem tipo. **Validação de input
-  faltando na fronteira** — trava T6 do `CLAUDE.md` aparecendo como erro de
-  lint. Exige schema de validação (zod), não type assertion.
-- `src/modules/leads/leads.service.ts` (6 ocorrências: L29, L52, L171, L244,
-  L313, L328) — mesmo módulo que está em 12,82% de cobertura (piso 90%).
-  Alvo depois de `auth`.
+- `src/modules/tenant-settings/tenant-settings.controller.ts` — 4 disables
+  (2× `no-unsafe-assignment` para `req.body`, 2× `no-unsafe-argument` para
+  o payload passado ao service). Trava T6 do `CLAUDE.md` aparecendo como
+  erro de lint. Exige schema de validação (zod), não type assertion.
+- `src/modules/leads/leads.service.ts` — 5 disables de tipagem
+  (`no-unsafe-assignment` × 3 + `no-unsafe-argument` × 1 + `no-unsafe-member-access`
+  × 1) + 1 disable de `sonarjs/no-duplicate-string` para o literal
+  `'tenant_id,lead_id'` (repetido 4x) + 1 disable de `max-lines` no topo
+  do arquivo (351 linhas, teto 300). Mesmo módulo que está em 12,82% de
+  cobertura (piso 90%). Alvo depois de `auth`.
 
 **Regra:** NÃO resolver unsafe-any com `as Tipo` — isso silencia o lint sem
 validar nada. A correção é schema de validação (zod ou equivalente) na
@@ -165,8 +182,34 @@ entrada. Uma type assertion diz ao compilador "confia em mim"; um schema diz
 ao runtime "prove". Só o segundo bloqueia payload malformado do request real.
 
 **Saída:**
-- tenant-settings.controller: schema zod para o payload de update das
+- `tenant-settings.controller`: schema zod para o payload de update das
   configurações do tenant + `.parse()` no handler antes de qualquer uso do
   `req.body`. Pode entrar antes do sprint de cobertura de leads.
-- leads.service: sai junto com o sprint que sobe a cobertura de `leads` do
-  12% para o piso 90%.
+- `leads.service`: sai junto com o sprint que sobe a cobertura de `leads` do
+  12% para o piso 90%. O disable de `max-lines` e a constante para
+  `'tenant_id,lead_id'` saem no mesmo passe — não fatiar o arquivo por
+  fatiar sem refatorar tipagem junto.
+
+---
+
+## 7. `auth` em 0% — BLOQUEADOR, não dívida
+
+**Onde:** `src/modules/auth/**` — piso de cobertura no `vitest.config.ts`
+está em **95%** e a cobertura real hoje é **0%**.
+
+**Regra:** este item **não é dívida gerenciada**. Módulo que decide de quem
+é cada dado (tenant, agent, sessão) não vira dívida com prazo confortável.
+O gate **permanece vermelho** enquanto o piso não for atendido, e **nenhum
+merge para `main` acontece com o gate vermelho por conta de auth**.
+
+**O que não fazer:**
+- **Não** baixar o piso de 95 para acomodar o número atual.
+- **Não** adicionar exceção manual no CI.
+- **Não** tratar como P2 "resolvo depois" — auth é P0 até ter teste.
+
+**Saída:** escrever os testes de auth antes de qualquer outro alvo de
+cobertura. Alvo mínimo é o piso já definido (95%): fluxo de JWT em
+`shared/middleware/auth.ts`, GET `/api/me`, resolução `user_id → agent →
+tenant_id`, casos de token ausente / inválido / expirado, e o cenário do
+agente inativo (`AgentLookupError`). Só depois disso o gate volta a fazer
+sentido como sinal.

@@ -14,7 +14,7 @@ export interface ConversationMessage {
 }
 
 // IntentType e PendingMessage — fonte de verdade em src/shared/types/domain.ts
-import type { IntentType } from '../../shared/types/domain'
+import type { IntentType, PendingMessage } from '../../shared/types/domain'
 export type { IntentType, PendingMessage } from '../../shared/types/domain'
 
 export type TransferReason =
@@ -29,7 +29,12 @@ export interface AIResponse {
   transferReason?: TransferReason
 }
 
-export interface GenerateResponseOptions {
+export interface GenerateResponseInput {
+  pendingMessages: PendingMessage[]
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+  config: AgentConfig
+  tenantId: string
+  phone: string
   // Quando true, IA usa o prompt preparatório (handoff em curso): conduz a espera,
   // não pede nova transferência, descarta marker [TRANSFER:] se aparecer.
   handoffMode?: boolean
