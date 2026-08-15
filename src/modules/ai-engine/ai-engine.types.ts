@@ -13,13 +13,9 @@ export interface ConversationMessage {
   timestamp: number
 }
 
-export type IntentType =
-  | 'compra'
-  | 'aluguel'
-  | 'venda'
-  | 'informacao'
-  | 'visita'
-  | 'desconhecido'
+// IntentType e PendingMessage — fonte de verdade em src/shared/types/domain.ts
+import type { IntentType } from '../../shared/types/domain'
+export type { IntentType, PendingMessage } from '../../shared/types/domain'
 
 export type TransferReason =
   | 'pedido_explicito'
@@ -31,14 +27,6 @@ export interface AIResponse {
   intent: IntentType
   shouldTransfer: boolean
   transferReason?: TransferReason
-}
-
-export interface PendingMessage {
-  text: string | null
-  mediaUrl: string | null
-  mimeType: string | null
-  type: 'text' | 'audio' | 'image' | 'document' | 'sticker' | 'location'
-  timestamp: number
 }
 
 export interface GenerateResponseOptions {

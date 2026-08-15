@@ -1,8 +1,7 @@
-export interface AuthAgent {
-  id: string
-  tenantId: string
-  active: boolean
-}
+// AuthAgent mudou de casa para src/shared/types/agent.ts. Re-export para
+// preservar imports existentes (agents/index.ts) — não colocar nada novo aqui.
+import type { AuthAgent } from '../../shared/types/agent'
+export type { AuthAgent }
 
 export interface HandoffTarget {
   phone: string

@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express'
 import { jwtVerify, createRemoteJWKSet, type JWTPayload } from 'jose'
-import { findActiveAgentByUserId, AgentLookupError } from '../../modules/agents'
+import { findActiveAgentByUserId, AgentLookupError } from '../database/agents-auth'
 import { captureSilentError } from '../observability/sentry'
 
 // -----------------------------------------------------------------------------

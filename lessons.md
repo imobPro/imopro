@@ -308,4 +308,42 @@ Raiz comum: URL externa não é `string` — é um input hostil que precisa de v
 
 ---
 
+## [2026-08-15] — Média de cobertura esconde buraco
+
+**Descoberta:** o módulo `agents` aparentava 47% de cobertura no baseline. Ao
+mover `findActiveAgentByUserId` (bem coberta, usada por todos os testes de
+middleware) para `src/shared/database/agents-auth.ts`, a cobertura de `agents`
+caiu para 33%. Não foi regressão — as linhas que ficaram no módulo tinham
+essa cobertura o tempo todo. A média mentia porque um único trecho bem
+coberto puxava o número pra cima e mascarava o buraco no resto.
+**Regra:** cobertura de pasta entre 40% e 60% é suspeita. Provavelmente esconde
+arquivo em 0% convivendo com arquivo em 90%+.
+**Pergunta de verificação:** "nesta pasta, existe arquivo em 0% convivendo
+com arquivo em 90%+? Se sim, a média está mentindo — abrir o relatório por
+arquivo, não confiar no número da pasta."
+
+---
+
+## [2026-08-15] — Propor antes de executar funcionou
+
+**Contexto:** ciclo de imports `billing ↔ onboarding` travado pelo depcruise.
+Antes de editar, apresentei o diagnóstico (por que o ciclo existe), duas
+alternativas descartadas com o motivo, os arquivos que seriam tocados e um
+pedido de ok explícito. Arthur confirmou; o refactor A1 saiu em uma tacada
+sem retrabalho.
+**Contrafactual:** sem o proposta-antes, o caminho fácil teria sido "quebrar
+o ciclo movendo uma das funções pro outro módulo" — refactor de 5 arquivos
+na direção errada, que precisaria ser desfeito quando o segundo par
+`billing.controller → onboarding.getZapiStatus` aparecesse.
+**Regra:** mudanças de risco alto ou médio (matriz do CLAUDE.md) usam esse
+formato antes de editar: (1) diagnóstico da causa raiz, (2) alternativas
+descartadas com o motivo, (3) arquivos afetados, (4) pedido de ok explícito.
+Refactor cross-módulo, mudança em RLS/auth/webhook, mudança que toca >2
+arquivos — todos entram nesse rito.
+**Pergunta de verificação:** "esta mudança toca mais de 2 arquivos ou alguma
+área de risco alto/médio da matriz? Se sim, propus antes de executar (com
+diagnóstico + alternativas descartadas + arquivos afetados + pedido de ok)?"
+
+---
+
 <!-- Novas lições entram acima desta linha, em ordem cronológica reversa (mais recente primeiro) -->

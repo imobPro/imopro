@@ -71,9 +71,9 @@ describe('tenantDb — validação de entrada', () => {
   it('lança se tenantId não-string', () => {
     // @ts-expect-error — testando defesa em runtime
     expect(() => tenantDb(null)).toThrow(/tenantId obrigatório/)
-    // @ts-expect-error
+    // @ts-expect-error — testando defesa em runtime
     expect(() => tenantDb(undefined)).toThrow(/tenantId obrigatório/)
-    // @ts-expect-error
+    // @ts-expect-error — testando defesa em runtime
     expect(() => tenantDb(123)).toThrow(/tenantId obrigatório/)
   })
 })

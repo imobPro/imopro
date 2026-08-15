@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { generateKeyPair, SignJWT, exportJWK } from 'jose'
 import type { Request, Response, NextFunction } from 'express'
 
-vi.mock('../modules/agents', () => ({
+vi.mock('../shared/database/agents-auth', () => ({
   findActiveAgentByUserId: vi.fn(),
   AgentLookupError: class extends Error {},
 }))
@@ -20,18 +20,18 @@ vi.mock('jose', async (importOriginal) => {
   const actual = await importOriginal<typeof import('jose')>()
   return {
     ...actual,
-    createRemoteJWKSet: () => async () => {
+    createRemoteJWKSet: () => () => {
       if (jwksMode === 'timeout') {
         const err = new Error('JWKS request timed out') as Error & { code?: string }
         err.code = 'ERR_JWKS_TIMEOUT'
-        throw err
+        return Promise.reject(err)
       }
-      return publicKey
+      return Promise.resolve(publicKey)
     },
   }
 })
 
-import { findActiveAgentByUserId } from '../modules/agents'
+import { findActiveAgentByUserId } from '../shared/database/agents-auth'
 import { requireAuth } from '../shared/middleware/auth'
 
 const ISSUER = `${process.env.SUPABASE_URL}/auth/v1`

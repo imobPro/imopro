@@ -419,7 +419,7 @@ export async function processWhatsAppJob(
   // 6b. Análise de sentimento geral via Haiku (avalia tom acumulado da conversa)
   let currentSentiment: SentimentType = 'neutro'
   if (history.length >= 2) {
-    currentSentiment = await analyzeSentiment(history).catch(() => 'neutro' as SentimentType)
+    currentSentiment = await analyzeSentiment(history).catch<SentimentType>(() => 'neutro')
     console.log(`[Worker] Sentimento | sentiment=${currentSentiment} phone=${maskPhone(phone)}`)
 
     if (currentSentiment === 'negativo') {

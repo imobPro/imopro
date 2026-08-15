@@ -13,11 +13,18 @@ vi.mock('../shared/zapi/client', async (importOriginal) => {
   return { ...actual, createInstance: vi.fn(), getQrCodeImage: vi.fn() }
 })
 
-vi.mock('../modules/billing', () => ({ startTrialClock: vi.fn() }))
+// Mocamos APENAS startTrialClock (os testes controlam se foi chamado).
+// getZapiStatus mantém a implementação real e lê do mock do supabase.
+vi.mock('../shared/database/tenant-status', async () => {
+  const actual = await vi.importActual<typeof import('../shared/database/tenant-status')>(
+    '../shared/database/tenant-status'
+  )
+  return { ...actual, startTrialClock: vi.fn() }
+})
 
 import { supabase } from '../shared/database/supabase'
 import { createInstance, getQrCodeImage, ZapiError } from '../shared/zapi/client'
-import { startTrialClock } from '../modules/billing'
+import { startTrialClock } from '../shared/database/tenant-status'
 import {
   signup,
   provisionZapi,

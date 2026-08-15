@@ -68,23 +68,27 @@ Sentry.setupExpressErrorHandler(app)
 
 app.use(errorHandler)
 
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
   console.log(`ImobPro rodando na porta ${PORT}`)
   startWhatsAppWorker()
   startReportsWorker()
   startBillingWorker()
-  try {
-    await registerReportsSchedules()
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[Boot] Falha ao registrar schedules de relatórios: ${msg}`)
-  }
-  try {
-    await registerBillingSchedules()
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[Boot] Falha ao registrar schedules de billing: ${msg}`)
-  }
+  // app.listen callback é síncrono (retorno void). Envelopamos os schedules
+  // async num IIFE + void para respeitar a assinatura sem misturar Promise.
+  void (async () => {
+    try {
+      await registerReportsSchedules()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[Boot] Falha ao registrar schedules de relatórios: ${msg}`)
+    }
+    try {
+      await registerBillingSchedules()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`[Boot] Falha ao registrar schedules de billing: ${msg}`)
+    }
+  })()
 })
 
 export default app

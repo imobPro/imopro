@@ -1,9 +1,9 @@
 import { supabase } from '../../shared/database/supabase'
+import { startTrialClock } from '../../shared/database/tenant-status'
 import { HttpError } from '../../shared/errors/http-error'
 import { maskEmail } from '../../shared/utils/pii'
 import { createInstance, getQrCodeImage, ZapiError } from '../../shared/zapi/client'
 import type { ZapiCreateInstanceResult, ZapiInstanceCredentials } from '../../shared/zapi/zapi.types'
-import { startTrialClock } from '../billing'
 import type {
   ConnectionStatusResult,
   ProvisionResult,
@@ -12,6 +12,13 @@ import type {
   ZapiConnectionStatus,
   ZapiStatusWebhookPayload,
 } from './onboarding.types'
+
+// PONTE — a implementação de getZapiStatus mora em shared/database/tenant-status.ts.
+// Este re-export existe só para não quebrar callers e testes atuais.
+// Não adicione lógica aqui. Ao tocar num caller, migre o import
+// para o shared e remova a ponte quando o último sair.
+// Registrado em docs/divida-tecnica.md.
+export { getZapiStatus } from '../../shared/database/tenant-status'
 
 // -----------------------------------------------------------------------------
 // Cadastro self-service
@@ -163,7 +170,7 @@ async function loadTenantZapi(tenantId: string): Promise<TenantZapiRow> {
     throw new HttpError(500, 'TENANT_LOOKUP_FAILED', 'Falha ao consultar o tenant')
   }
   if (!data) throw new HttpError(404, 'TENANT_NOT_FOUND', 'Tenant não encontrado')
-  return data as TenantZapiRow
+  return data
 }
 
 async function ensureEmailConfirmed(userId: string): Promise<void> {
@@ -313,23 +320,6 @@ export async function getZapiInstanceCredentials(
   // contrário o piloto não foi configurado.
   if (envInstance && envToken) return { instanceId: envInstance, instanceToken: envToken }
   return null
-}
-
-// Lê apenas o status atual da Z-API. Usado pelo worker (silencia IA quando
-// desconectado) e pelo controller de billing (frontend mostra banner danger).
-// Default permissivo: erro de banco/ausência → 'not_provisioned' (não bloqueia
-// atendimento por falha de leitura).
-export async function getZapiStatus(tenantId: string): Promise<ZapiConnectionStatus> {
-  const { data, error } = await supabase
-    .from('tenants')
-    .select('zapi_status')
-    .eq('id', tenantId)
-    .maybeSingle()
-  if (error) {
-    console.error(`[Onboarding] getZapiStatus falhou tenant=${tenantId}: ${error.message}`)
-    return 'not_provisioned'
-  }
-  return ((data?.zapi_status as ZapiConnectionStatus | null) ?? 'not_provisioned')
 }
 
 // -----------------------------------------------------------------------------

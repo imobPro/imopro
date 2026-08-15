@@ -109,7 +109,7 @@ export async function generateAndSendReportForAgent(
   const html = buildHtml(metrics)
   const filename = buildFilename(agent, periodType, period.end)
 
-  let emailId: string | null = null
+  let emailId: string | null
   try {
     const sent = await sendEmail({
       to: agent.email,

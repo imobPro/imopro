@@ -60,7 +60,7 @@ export async function getSubscription(tenantId: string): Promise<Subscription | 
     return null
   }
   if (!data) return null
-  return rowToSubscription(data as SubscriptionRow)
+  return rowToSubscription(data)
 }
 
 /**
@@ -108,30 +108,17 @@ export async function incrementTrialMessageCount(tenantId: string): Promise<numb
   return data
 }
 
-/**
- * Inicia o relógio do trial: grava `trial_started_at = now()` e
- * `trial_ends_at = now() + TRIAL_DAYS`. Chamado pelo webhook /webhook/zapi-status
- * quando a instância Z-API conecta pela primeira vez.
- *
- * Idempotente via guarda `trial_started_at IS NULL`: reconectar depois de uma
- * queda não reinicia o relógio, e um trial já `expired`/`active` (status != trial)
- * também não é tocado.
- */
-export async function startTrialClock(tenantId: string): Promise<void> {
-  const now = new Date()
-  const endsAt = new Date(now.getTime() + getTrialDays() * DAY_MS)
+// PONTE — a implementação mora em shared/database/tenant-status.ts.
+// Este re-export existe só para não quebrar callers e testes atuais.
+// Não adicione lógica aqui. Ao tocar num caller, migre o import
+// para o shared e remova a ponte quando o último sair.
+// Registrado em docs/divida-tecnica.md.
+export { startTrialClock } from '../../shared/database/tenant-status'
 
-  const { error } = await supabase
-    .from('subscriptions')
-    .update({ trial_started_at: now.toISOString(), trial_ends_at: endsAt.toISOString() })
-    .eq('tenant_id', tenantId)
-    .eq('status', 'trial')
-    .is('trial_started_at', null)
-
-  if (error) {
-    console.error(`[Billing] startTrialClock falhou tenant=${tenantId}: ${error.message}`)
-  }
-}
+// Exposto pelo service para o controller manter a regra "controller não toca
+// banco" (dep-cruiser `controller-nao-toca-banco`). billing.controller usa esse
+// re-export em vez de importar direto de shared/database.
+export { getZapiStatus } from '../../shared/database/tenant-status'
 
 /**
  * Marca trial como expirado. Idempotente — só atualiza se status atual é trial.
@@ -176,7 +163,7 @@ export async function markActive(tenantId: string, planId: string): Promise<Subs
     console.error(`[Billing] markActive falhou tenant=${tenantId}: ${error?.message ?? 'no data'}`)
     throw new HttpError(500, 'UPDATE_FAILED', 'Falha ao ativar plano')
   }
-  return rowToSubscription(data as SubscriptionRow)
+  return rowToSubscription(data)
 }
 
 /**

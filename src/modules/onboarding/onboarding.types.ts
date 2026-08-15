@@ -3,8 +3,10 @@
 // - individual: corretor autônomo, o tenant é o próprio corretor
 export type OperationMode = 'shared' | 'individual'
 
-// Lifecycle da conexão WhatsApp (espelha o CHECK de tenants.zapi_status).
-export type ZapiConnectionStatus = 'not_provisioned' | 'awaiting_qr' | 'connected' | 'disconnected'
+// Lifecycle da conexão WhatsApp — a fonte de verdade agora mora em
+// src/shared/types/tenant.ts (compartilhada com billing e shared/database).
+import type { ZapiConnectionStatus } from '../../shared/types/tenant'
+export type { ZapiConnectionStatus }
 
 export interface SignupInput {
   operationMode: OperationMode

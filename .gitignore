@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# ─── Skills vendored via npx skills add (Leonxlnx/taste-skill etc) ───────────
+.agents/
+
 # ─── Build ───────────────────────────────────────────────────────────────────
 dist/
 build/

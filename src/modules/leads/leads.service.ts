@@ -7,7 +7,7 @@ import type {
   UpsertLeadParams,
   SaveConversationMessagesParams,
 } from './leads.types'
-import type { IntentType } from '../ai-engine/ai-engine.types'
+import type { IntentType } from '../../shared/types/domain'
 
 // -----------------------------------------------------------------------------
 // Score delta por intenção detectada pela IA

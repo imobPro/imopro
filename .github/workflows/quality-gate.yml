@@ -2,6 +2,10 @@ name: Quality Gate
 
 # Portão. Nada entra na main sem passar por aqui.
 # Se está vermelho, não existe "só desta vez" (docs/quality-gate.md).
+#
+# Jobs separados de propósito: quando falha, o nome do job já diz que tipo de
+# problema é. "Guardas de segurança falhou" e "complexidade falhou" pedem
+# reações muito diferentes.
 
 on:
   push:
@@ -30,8 +34,62 @@ jobs:
       - name: tsc --noEmit (zero any)
         run: npx tsc --noEmit
 
+  estilo:
+    name: ESLint e limites de complexidade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: ESLint (--max-warnings 0)
+        run: npx eslint . --max-warnings 0
+
+  dependencias:
+    name: Estrutura de dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regras de arquitetura
+        # Bloqueia ciclo, módulo importando módulo, controller tocando banco
+        # e Supabase fora do repositório de tenant.
+        run: npx depcruise src --config .dependency-cruiser.cjs
+
+      - name: Métricas de acoplamento
+        # Não bloqueia — serve para acompanhar a tendência ao longo dos sprints.
+        run: npx depcruise src --config .dependency-cruiser.cjs --output-type metrics
+        continue-on-error: true
+
+      - name: Gráfico de dependências
+        run: |
+          sudo apt-get update && sudo apt-get install -y graphviz
+          mkdir -p artefatos
+          npx depcruise src --config .dependency-cruiser.cjs \
+            --output-type dot | dot -T svg > artefatos/dependencias.svg
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: grafico-dependencias
+          path: artefatos/
+          retention-days: 14
+
   tests:
-    name: Vitest (inclui guardas de segurança)
+    name: Vitest com cobertura
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +104,33 @@ jobs:
       # Roda a suite inteira, incluindo src/tests/security/*. O rls-guard
       # fica skipped enquanto o repo não tiver SUPABASE_DB_URL configurado
       # como secret (comportamento igual ao ambiente local).
-      - name: vitest run
-        run: npx vitest run
+      - name: vitest run --coverage
+        run: npx vitest run --coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorio-cobertura
+          path: coverage/
+          retention-days: 14
+
+  guardas:
+    name: Guardas de segurança
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: RLS, isolamento de tenant e segredos
+        # Quando este job falha, o problema não é "o CI quebrou".
+        # É "uma trava de segurança foi violada". Pare e resolva.
+        run: npx vitest run src/tests/security --reporter=verbose
 
   segredos:
     name: Varredura de segredos (Gitleaks)
@@ -73,3 +156,37 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
           tar -xzf gitleaks.tar.gz gitleaks
           ./gitleaks detect --source . --redact --verbose
+
+  # Carga não roda em todo PR: sobe a aplicação inteira e leva minutos.
+  # Roda semanalmente e sob demanda, pra acompanhar a tendência.
+  carga:
+    name: Teste de carga
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Sobe a aplicação com adaptadores externos mockados
+        run: npm run start:test &
+        env:
+          NODE_ENV: test
+          MOCK_EXTERNAL_APIS: 'true' # sem isso, mede a Anthropic e queima token
+          REDIS_URL: redis://localhost:6379
+
+      - run: npx wait-on http://localhost:3000/health -t 60000
+
+      - uses: grafana/setup-k6-action@v1
+      - name: Carga no webhook
+        run: k6 run src/tests/load/webhook-zapi.js
+        env:
+          BASE_URL: http://localhost:3000
+          WEBHOOK_TOKEN: token-de-teste

@@ -16,8 +16,8 @@ function mockFetch(responses: Array<{ ok: boolean; status: number; body: unknown
     fn.mockResolvedValueOnce({
       ok: r.ok,
       status: r.status,
-      json: async () => r.body,
-      text: async () => (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)),
+      json: () => Promise.resolve(r.body),
+      text: () => Promise.resolve(typeof r.body === 'string' ? r.body : JSON.stringify(r.body)),
     } as unknown as Response)
   }
   global.fetch = fn as unknown as typeof fetch

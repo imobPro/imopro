@@ -81,9 +81,16 @@ function listarArquivos(dir: string, acc: string[] = []): string[] {
   return acc
 }
 
+// Extraído do teste para não estourar max-nested-callbacks (describe > it >
+// filter > some seriam 4). Casa por substring case-insensitive.
+function contemNomeProibido(chave: string): boolean {
+  const upper = chave.toUpperCase()
+  return NUNCA_PUBLICO.some((proibida) => upper.includes(proibida))
+}
+
 describe('Guarda de segredos (T5)', () => {
   it('nenhum segredo está declarado com prefixo NEXT_PUBLIC_ no .env.example', () => {
-    let envExample = ''
+    let envExample: string
     try {
       envExample = readFileSync(join(RAIZ, '.env.example'), 'utf8')
     } catch {
@@ -96,9 +103,7 @@ describe('Guarda de segredos (T5)', () => {
       .filter((l) => l.startsWith('NEXT_PUBLIC_'))
       .map((l) => l.split('=')[0])
 
-    const vazando = publicas.filter((chave) =>
-      NUNCA_PUBLICO.some((proibida) => chave.toUpperCase().includes(proibida)),
-    )
+    const vazando = publicas.filter(contemNomeProibido)
 
     expect(
       vazando,

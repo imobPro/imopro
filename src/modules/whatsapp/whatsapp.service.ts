@@ -6,7 +6,7 @@ import { addExternalCallBreadcrumb } from '../../shared/observability/sentry'
 import { getNextBusinessDay, type BusinessHoursConfig } from '../../shared/utils/business-hours'
 import { maskPhone } from '../../shared/utils/pii'
 import type { WhatsAppMessageJob, MessageType } from '../../shared/queue/queue.types'
-import type { PendingMessage } from '../ai-engine/ai-engine.types'
+import type { PendingMessage } from '../../shared/types/domain'
 import type {
   ZApiWebhookPayload,
   LeadProfile,

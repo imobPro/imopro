@@ -1,7 +1,6 @@
 import type { Request, Response } from 'express'
 import { HttpError } from '../../shared/errors/http-error'
-import { getSubscription, markActive, toSubscriptionView } from './billing.service'
-import { getZapiStatus } from '../onboarding'
+import { getSubscription, getZapiStatus, markActive, toSubscriptionView } from './billing.service'
 
 function requireAuth(req: Request): { tenantId: string } {
   if (!req.auth) throw new HttpError(401, 'MISSING_AUTH', 'Não autenticado')

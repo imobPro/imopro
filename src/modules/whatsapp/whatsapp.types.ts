@@ -57,16 +57,10 @@ export interface ZApiWebhookPayload {
 }
 
 // ---------------------------------------------------------------------------
-// Perfis de lead — 6 tipos de negócio
+// Perfis de lead — fonte de verdade em src/shared/types/domain.ts
 // ---------------------------------------------------------------------------
 
-export type LeadProfile =
-  | 'comprador'
-  | 'inquilino'
-  | 'vendedor'
-  | 'captacao'    // proprietário quer que a imobiliária administre o imóvel
-  | 'investidor'  // compra para alugar ou revender
-  | 'indicador'   // indica outra pessoa, sem interesse direto
+export type { LeadProfile } from '../../shared/types/domain'
 
 // ---------------------------------------------------------------------------
 // Gatilhos de transferência para corretor humano — 6 situações

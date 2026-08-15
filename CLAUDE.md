@@ -53,6 +53,56 @@ Nunca use Opus para tarefas simples. Nunca use Haiku para decisões críticas.
 
 ---
 
+## Baseline atual — 2026-08-15
+
+Números fotografados no dia em que o Quality Gate foi ligado. **Regra da
+catraca: baixar UM ponto por sprint, nunca subir.** Se um sprint precisar
+subir um limite, é sinal de que o refactor perdeu direção — para e discute.
+
+### Complexidade (ESLint)
+
+| Regra | Limite atual | Pior arquivo hoje |
+|---|---:|---|
+| `complexity` (ciclomática) | 25 | `whatsapp.worker.ts::processWhatsAppJob` = 56 (quarentena, ver `docs/divida-tecnica.md`) |
+| `sonarjs/cognitive-complexity` | 20 | `whatsapp.worker.ts::processWhatsAppJob` = 108 (quarentena) |
+| `max-depth` | 4 | — |
+| `max-lines-per-function` | 100 | — |
+| `max-params` | 5 | — |
+
+Fora da quarentena, o pior é `signup` (`onboarding.service.ts`) em 25 — bate no teto.
+
+### Cobertura de testes (Vitest)
+
+| Pasta | Piso | Cobertura real hoje | Estado |
+|---|---:|---:|---|
+| Piso global | 50 | 52,42 lines | ✅ |
+| `shared/database/**` | 90 | 90,47 lines | ✅ (folga zero — proteger) |
+| `modules/auth/**` | **95** | **0** | 🔴 **proposital** — escrever testes, não baixar |
+| `modules/leads/**` | **90** | 12,82 lines | 🔴 **proposital** — escrever testes, não baixar |
+| `modules/onboarding/**` | 75 | 76,04 | ✅ (folga zero) |
+| `modules/ai-engine/**` | 55 | 59,55 | ✅ |
+| `modules/billing/**` | 55 | 58,24 | ✅ |
+| `modules/tenant-settings/**` | 55 | 59,20 | ✅ |
+| `modules/agents/**` | 45 | 47,36 | ✅ |
+| `modules/reports/**` | 40 | 42,10 | ✅ |
+| `modules/whatsapp/**` | 30 | 30,89 | ✅ (folga zero — worker.ts em 3,77) |
+| `modules/sentiment/**` | 15 | 15,00 | ✅ (folga zero) |
+
+### Dependências (depcruise)
+
+Regra `modulo-so-importa-shared` (substitui a antiga `modulos-independentes`).
+Camada 2 (orquestradores) autorizada em:
+- `modules/whatsapp/whatsapp.worker.ts`
+- `modules/reports/reports.{cron,metrics,pdf,service,types}.ts`
+
+### Dívida técnica registrada
+
+Ver `docs/divida-tecnica.md`. Itens ativos: quarentena de `processWhatsAppJob`,
+pontes `billing.startTrialClock` / `onboarding.getZapiStatus` / `agents.findActiveAgentByUserId`,
+pontes de tipos (`LeadProfile`, `IntentType`, `ZapiConnectionStatus`, `AuthAgent`).
+
+---
+
 ## Quality Gate — travas de segurança
 
 Referência longa em `docs/quality-gate.md`. Resumo obrigatório abaixo.
