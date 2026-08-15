@@ -128,6 +128,20 @@ Sem teste cobrindo, nada é baixo risco.
 - **T5 · Segredo nunca chega no navegador.** Prefixo `NEXT_PUBLIC_` = vai pro bundle. Proibido para: `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `ZAPI_TOKEN`, `ZAPI_CLIENT_TOKEN`, `RESEND_API_KEY`, `WEBHOOK_SECRET`, `STRIPE_SECRET_KEY`, `SUPABASE_DB_URL`. Guarda mecânica: `src/tests/security/secrets-guard.test.ts`.
 - **T6 · Todo input é hostil, o do lead do WhatsApp mais ainda.** Prompt injection: mensagem envolvida em tag XML com nonce (✅). Cap de custo: 100 msgs/dia por (tenant, phone) (✅). XSS/upload rich: 🟡 auditar antes de Fase 4.
 
+### Regra dos códigos de status na auth
+
+Duas famílias, dois contratos. Trocar entre elas é bug de segurança, não estilo.
+
+- **401 — "não sei quem você é" (pré-autenticação):**
+  - `MISSING_AUTH` para header ausente ou Bearer vazio (cliente sabe que não mandou, não vaza).
+  - `INVALID_TOKEN` para qualquer causa que impeça validar o JWT: assinatura inválida, expirado, audience errada, issuer errado, `sub` ausente, token malformado.
+  - **As cinco causas de `INVALID_TOKEN` devem retornar corpo idêntico** — mesmo `code`, mesma `message`. Diferenciar entrega ao atacante um oráculo para forjar tokens. Snapshot coberto por `src/tests/auth.middleware.test.ts` (`P2 — família 401 …`).
+- **403 — "sei quem você é e não pode" (pós-autenticação):**
+  - `NO_ACTIVE_AGENT` quando o JWT é válido mas o `user_id` não tem `agent` ativo. Cliente sabe que autenticou; a resposta reconhece isso. Justificativa prática: MVP provisiona tenant manual — entre cadastro e criação do agent existe janela legítima; 401 aqui derrubaria o frontend em loop.
+  - **O corpo do 403 nunca inclui dados de terceiros** (tenant, agent id, email alheio). Regex de defesa em `src/tests/auth.middleware.test.ts` (`P2 — NO_ACTIVE_AGENT (403) não vaza …`) trava regressão futura.
+
+Antes de mudar `res.status()` em `src/shared/middleware/auth.ts`, releia este bloco.
+
 ### Definition of Done
 
 - [ ] Risco classificado e rito da matriz cumprido

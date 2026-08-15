@@ -213,3 +213,46 @@ cobertura. Alvo mínimo é o piso já definido (95%): fluxo de JWT em
 tenant_id`, casos de token ausente / inválido / expirado, e o cenário do
 agente inativo (`AgentLookupError`). Só depois disso o gate volta a fazer
 sentido como sinal.
+
+**Status (2026-08-15):** três grupos de teste entregues.
+- P1 (T1) — `auth.middleware.test.ts` `P1 — tenant vem do JWT, nunca do request`.
+- P2 (rejeição uniforme) — `auth.middleware.test.ts` `P2 — família 401 …`,
+  `MISSING_AUTH ≠ INVALID_TOKEN`, `NO_ACTIVE_AGENT (403) não vaza …`.
+- P3 (T3) — `auth.mount.matrix.test.ts` cobre toda rota `/api/*`
+  autenticada. Cobertura de `getMe` em `auth.controller.test.ts` fecha o
+  módulo em 100% (piso 95%).
+- Fix derivado: mensagem `"Token sem subject"` uniformizada em
+  `shared/middleware/auth.ts` para não vazar a sub-causa do INVALID_TOKEN.
+
+---
+
+## 8. RBAC — sistema de papéis pendente
+
+**Estado atual:** todo user autenticado é `agent`. Não há `admin`,
+`manager` ou `gestor` no schema, no JWT ou nos routers. A checagem T3 do
+`CLAUDE.md` se reduz hoje a "toda rota `/api/*` passa por `requireAuth`"
+(coberto por `src/tests/auth.mount.matrix.test.ts`); e IDOR/T4 é
+responsabilidade de cada módulo (filtro `tenant_id` na mesma query,
+protegido pelo wrapper `tenantDb()` — regra 1 do CLAUDE.md).
+
+**Por que existe:** o **Modelo 1** de operação (número único da imobiliária,
+ver CLAUDE.md "Modelos de operação — CRÍTICO") vai precisar diferenciar o
+dono/gestor da imobiliária dos corretores internos — permissões para trocar
+plano, ver relatórios cross-corretor, gerenciar visibilidade, etc. Enquanto
+o produto ainda opera 1:1 (Modelo 2, ou Modelo 1 sem hierarquia), RBAC
+seria feature sem consumidor real.
+
+**Saída:** quando o primeiro cliente do Modelo 1 chegar E pedir permissões
+diferenciadas:
+1. Coluna `role` na tabela `agents` (`'owner' | 'agent'` para começar).
+2. Custom claim `role` no JWT via Supabase Auth Hook (não via lookup no
+   backend — evita round-trip extra no `requireAuth`).
+3. Middleware `requireRole('owner')` seguindo o mesmo padrão do
+   `requireAuth`, aplicado por rota nos routers.
+4. Estender `auth.mount.matrix.test.ts` com uma segunda matriz
+   `OWNER_ONLY_ROUTES` para provar que rota de gestor rejeita corretor
+   comum com 403.
+
+**Regra: não escrever `it.skip` como placeholder** — teste desabilitado
+rot no CI e vira sinônimo de "algum dia". O teste aparece junto com a
+feature, ou não aparece.

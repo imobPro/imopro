@@ -77,7 +77,10 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   }
 
   if (typeof payload.sub !== 'string') {
-    res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token sem subject' } })
+    // Mesma mensagem das demais causas de INVALID_TOKEN — a família 401
+    // (pré-autenticação) precisa ser indistinguível para o atacante.
+    // Ver CLAUDE.md, seção "Regra dos códigos de status na auth".
+    res.status(401).json({ error: { code: 'INVALID_TOKEN', message: 'Token inválido ou expirado' } })
     return
   }
 
