@@ -1,5 +1,6 @@
 import { tenantDb } from '../../shared/database/tenant-db'
 import { sendEmail } from '../../shared/email'
+import { maskId } from '../../shared/utils/pii'
 import type { AgentForReports } from '../agents'
 import { listAgentsForReports } from '../agents'
 import { buildMetrics, buildPeriod } from './reports.metrics'
@@ -27,7 +28,7 @@ export async function runReportsForAllAgents(periodType: PeriodType): Promise<{
     } catch (err) {
       failed += 1
       const msg = err instanceof Error ? err.message : String(err)
-      console.error(`[Reports] Agent ${agent.agentId} falhou: ${msg}`)
+      console.error(`[Reports] Agent ${maskId(agent.agentId)} falhou: ${msg}`)
     }
   }
 
@@ -61,7 +62,7 @@ export async function generateAndSendReportForAgent(
   // GenericStringError no fallback). Cast local pra recuperar o shape esperado.
   const existingRow = existing as { id: string; sent_at: string | null } | null
   if (existingRow?.sent_at) {
-    console.log(`[Reports] Já enviado | agent=${agent.agentId} ${periodType}`)
+    console.log(`[Reports] Já enviado | agent=${maskId(agent.agentId)} ${periodType}`)
     return { reportId: existingRow.id, emailId: null }
   }
 

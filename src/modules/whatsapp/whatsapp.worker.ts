@@ -4,7 +4,7 @@ import { redisConnection } from '../../shared/queue/redis'
 import { withJobMonitoring } from '../../shared/observability/sentry'
 import { WHATSAPP_QUEUE_NAME } from '../../shared/queue/queues'
 import { buildScheduleFromTenant, isWithinBusinessHours } from '../../shared/utils/business-hours'
-import { maskPhone } from '../../shared/utils/pii'
+import { maskPhone, maskId } from '../../shared/utils/pii'
 import {
   detectLeadProfile,
   shouldTransferToHuman,
@@ -170,7 +170,7 @@ async function alertCorretor(
       message: buildCorretorAlert(leadPhone, tenantId),
     })
     if (sent) {
-      console.log(`[Worker] Alerta enviado ao corretor | agent=${target.agentId} phone=${maskPhone(target.phone)}`)
+      console.log(`[Worker] Alerta enviado ao corretor | agent=${maskId(target.agentId)} phone=${maskPhone(target.phone)}`)
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

@@ -1,4 +1,5 @@
 import { supabase } from '../../shared/database/supabase'
+import { maskId } from '../../shared/utils/pii'
 import type { LeadStatus } from '../leads/leads.types'
 import type { PeriodType, ReportMetrics, ReportPeriod } from './reports.types'
 
@@ -56,7 +57,7 @@ export async function getLeadsCount(
     .lt('created_at', period.end.toISOString())
 
   if (error) {
-    console.error(`[Reports] getLeadsCount falhou | agent=${agentId} erro=${error.message}`)
+    console.error(`[Reports] getLeadsCount falhou | agent=${maskId(agentId)} erro=${error.message}`)
     return 0
   }
   return count ?? 0
@@ -83,7 +84,7 @@ export async function getFunnelCounts(
     .eq('agent_id', agentId)
 
   if (error) {
-    console.error(`[Reports] getFunnelCounts falhou | agent=${agentId} erro=${error.message}`)
+    console.error(`[Reports] getFunnelCounts falhou | agent=${maskId(agentId)} erro=${error.message}`)
     return result
   }
 
@@ -113,7 +114,7 @@ export async function getAvgQualificationHours(
     .lt('qualified_at', period.end.toISOString())
 
   if (error) {
-    console.error(`[Reports] getAvgQualificationHours falhou | agent=${agentId} erro=${error.message}`)
+    console.error(`[Reports] getAvgQualificationHours falhou | agent=${maskId(agentId)} erro=${error.message}`)
     return null
   }
   return averageHours(data as Array<{ created_at: string; qualified_at: string }>, 'qualified_at')
@@ -138,7 +139,7 @@ export async function getAvgClosingHours(
     .lt('closed_at', period.end.toISOString())
 
   if (error) {
-    console.error(`[Reports] getAvgClosingHours falhou | agent=${agentId} erro=${error.message}`)
+    console.error(`[Reports] getAvgClosingHours falhou | agent=${maskId(agentId)} erro=${error.message}`)
     return null
   }
   return averageHours(data as Array<{ created_at: string; closed_at: string }>, 'closed_at')

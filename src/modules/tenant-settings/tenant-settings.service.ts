@@ -1,6 +1,7 @@
 import { supabase } from '../../shared/database/supabase'
 import { tenantDb } from '../../shared/database/tenant-db'
 import { HttpError } from '../../shared/errors/http-error'
+import { maskId } from '../../shared/utils/pii'
 import {
   VISIBILITY_SECTIONS,
   type AgentVisibility,
@@ -217,7 +218,7 @@ export async function getAgentVisibility(
     .maybeSingle()
 
   if (error) {
-    console.error(`[TenantSettings] getAgentVisibility falhou agent=${agentId}: ${error.message}`)
+    console.error(`[TenantSettings] getAgentVisibility falhou agent=${maskId(agentId)}: ${error.message}`)
     return {}
   }
   return sanitizeVisibility(
@@ -244,7 +245,7 @@ export async function updateAgentVisibility(
     .eq('id', agentId)
 
   if (error) {
-    console.error(`[TenantSettings] updateAgentVisibility falhou agent=${agentId}: ${error.message}`)
+    console.error(`[TenantSettings] updateAgentVisibility falhou agent=${maskId(agentId)}: ${error.message}`)
     throw new HttpError(500, 'UPDATE_FAILED', 'Falha ao salvar preferência de visualização')
   }
 
@@ -262,7 +263,7 @@ export async function getAgentPhone(
     .maybeSingle()
 
   if (error) {
-    console.error(`[TenantSettings] getAgentPhone falhou agent=${agentId}: ${error.message}`)
+    console.error(`[TenantSettings] getAgentPhone falhou agent=${maskId(agentId)}: ${error.message}`)
     return null
   }
   return (data as { phone?: string | null } | null)?.phone ?? null
@@ -290,7 +291,7 @@ export async function updateAgentPhone(
     .update({ phone: digits })
     .eq('id', agentId)
   if (error) {
-    console.error(`[TenantSettings] updateAgentPhone falhou agent=${agentId}: ${error.message}`)
+    console.error(`[TenantSettings] updateAgentPhone falhou agent=${maskId(agentId)}: ${error.message}`)
     throw new HttpError(500, 'UPDATE_FAILED', 'Falha ao salvar telefone')
   }
   return digits

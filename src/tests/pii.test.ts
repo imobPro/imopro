@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { maskPhone, maskEmail } from '../shared/utils/pii'
+import { maskPhone, maskEmail, maskId } from '../shared/utils/pii'
 
 describe('maskPhone', () => {
   it('mascara telefone brasileiro completo', () => {
@@ -73,5 +73,51 @@ describe('maskEmail', () => {
 
   it('domínio inteiro é preservado — útil para distinguir gmail vs corporativo em debug', () => {
     expect(maskEmail('joao@empresa-do-cliente.com.br')).toBe('j***o@empresa-do-cliente.com.br')
+  })
+})
+
+describe('maskId', () => {
+  it('mascara UUID preservando os 8 primeiros chars', () => {
+    expect(maskId('550e8400-e29b-41d4-a716-446655440000')).toBe('550e8400-****')
+  })
+
+  it('duas chamadas com o mesmo UUID produzem o mesmo prefixo — permite correlação', () => {
+    const a = maskId('550e8400-e29b-41d4-a716-446655440000')
+    const b = maskId('550e8400-e29b-41d4-a716-446655440000')
+    expect(a).toBe(b)
+  })
+
+  it('UUIDs diferentes com o mesmo prefixo dão máscaras iguais — trade-off aceito', () => {
+    // Colisão de prefixo entre 8 hex chars é ~1 em 4,3 bilhões — irrelevante na
+    // prática para um único tenant, e o benefício de menor cardinalidade em log
+    // pesa mais que essa possibilidade teórica.
+    expect(maskId('550e8400-aaaa-bbbb-cccc-dddddddddddd'))
+      .toBe(maskId('550e8400-1111-2222-3333-444444444444'))
+  })
+
+  it('null e undefined viram marker legível', () => {
+    expect(maskId(null)).toBe('(null)')
+    expect(maskId(undefined)).toBe('(null)')
+  })
+
+  it('string vazia vira (empty)', () => {
+    expect(maskId('')).toBe('(empty)')
+  })
+
+  it('id curto demais mascara tudo pra não vazar o valor inteiro', () => {
+    expect(maskId('curto')).toBe('***')
+    expect(maskId('agent-1')).toBe('***')
+    expect(maskId('12345678901')).toBe('***') // 11 chars — ainda abaixo do limite
+  })
+
+  it('id com exatamente 12 chars já cabe no formato prefixo+****', () => {
+    expect(maskId('abcdefghijkl')).toBe('abcdefgh-****')
+  })
+
+  it('nunca deixa o id original recuperável só a partir da máscara', () => {
+    const original = '550e8400-e29b-41d4-a716-446655440000'
+    const masked = maskId(original)
+    expect(masked).not.toBe(original)
+    expect(masked.length).toBeLessThan(original.length)
   })
 })

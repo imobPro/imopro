@@ -59,3 +59,25 @@ export function maskEmail(email: string | null | undefined): string {
   if (local.length === 2) return `${local[0]}*${local[1]}@${domain}`
   return `${local[0]}***${local[local.length - 1]}@${domain}`
 }
+
+/**
+ * Mascara um identificador opaco (UUID de agent/tenant/lead/report) preservando
+ * apenas os 8 primeiros caracteres — o suficiente para correlacionar linhas de
+ * log do mesmo recurso sem entregar o id inteiro em caso de vazamento (Railway
+ * stdout, Sentry breadcrumb). 8 hex chars = ~4,3 bilhões de combinações, então
+ * o prefixo é único na prática para o volume de um tenant sem ser enumerável.
+ *
+ *   maskId('550e8400-e29b-41d4-a716-446655440000')  → '550e8400-****'
+ *   maskId('agent-abcdefghijkl')                    → 'agent-ab-****'
+ *   maskId('curto')                                 → '***'
+ *   maskId(null)                                    → '(null)'
+ *   maskId(undefined)                               → '(null)'
+ *   maskId('')                                      → '(empty)'
+ */
+export function maskId(id: string | null | undefined): string {
+  if (id === null || id === undefined) return '(null)'
+  if (typeof id !== 'string') return '(invalid)'
+  if (id.length === 0) return '(empty)'
+  if (id.length < 12) return '***'
+  return `${id.slice(0, 8)}-****`
+}
